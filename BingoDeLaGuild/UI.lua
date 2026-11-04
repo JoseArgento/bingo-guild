@@ -1,0 +1,246 @@
+local ADDON, ns = ...
+local L = ns.L
+
+-- The card window: 5x5 squares on the left, the guild's cards on the right. Built the first time it opens.
+
+local CELL_W, CELL_H, GAP = 92, 66, 4
+local GRID_W = CELL_W * 5 + GAP * 4
+local SIDE_W = 140
+local LIST_ROWS = 12
+
+local COLORS = {
+	todo = { 0.08, 0.08, 0.1, 0.85 },
+	done = { 0.16, 0.42, 0.18, 0.9 },
+	line = { 0.62, 0.45, 0.08, 0.95 },
+	free = { 0.35, 0.28, 0.12, 0.9 },
+}
+
+local UI = {}
+ns.UI = UI
+
+local function names(list, max)
+	if #list <= max then
+		return table.concat(list, ", ")
+	end
+	local shown = {}
+	for i = 1, max do
+		shown[i] = list[i]
+	end
+	return table.concat(shown, ", ") .. " +" .. (#list - max)
+end
+
+local function cellTooltip(cell)
+	local id = cell.goalID
+	GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
+	if id == "free" then
+		GameTooltip:SetText(L.FREE)
+		GameTooltip:Show()
+		return
+	end
+	local g = ns.GOAL[id]
+	GameTooltip:SetText(ns.GoalText(g), 1, 1, 1, 1, true)
+	if g.count then
+		GameTooltip:AddLine(ns.Done(id) and L.AUTO or L.AUTO_TOO, 0.7, 0.7, 0.7, true)
+		if g.need > 1 then
+			GameTooltip:AddLine(L.PROGRESS:format(ns.Progress(g), g.need), 1, 0.82, 0)
+		end
+	else
+		GameTooltip:AddLine(L.MANUAL, 0.7, 0.7, 0.7, true)
+	end
+	local have = {}
+	for sender, c in pairs(ns.GuildCards()) do
+		if c.m:sub(cell.index, cell.index) == "1" then
+			have[#have + 1] = sender
+		end
+	end
+	if #have > 0 then
+		table.sort(have)
+		GameTooltip:AddLine(L.HAVE_IT:format(names(have, 8)), 0.5, 0.9, 0.5, true)
+	end
+	GameTooltip:Show()
+end
+
+local function build()
+	local FRAME = ADDON .. "Frame"
+	local f = CreateFrame("Frame", FRAME, UIParent, "BasicFrameTemplateWithInset")
+	f:SetSize(14 + GRID_W + 12 + SIDE_W + 12, 440)
+	f:SetPoint("CENTER")
+	f:SetFrameStrata("HIGH")
+	f:SetToplevel(true)
+	f:SetClampedToScreen(true)
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:Hide()
+	f.TitleText:SetText(L.TITLE)
+	tinsert(UISpecialFrames, FRAME)
+	UI.frame = f
+
+	f.week = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.week:SetPoint("TOPLEFT", 16, -34)
+	f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	f.status:SetPoint("TOPLEFT", 16 + GRID_W - 200, -34)
+	f.status:SetWidth(200)
+	f.status:SetJustifyH("RIGHT")
+
+	local grid = CreateFrame("Frame", nil, f)
+	grid:SetPoint("TOPLEFT", 14, -58)
+	grid:SetSize(GRID_W, CELL_H * 5 + GAP * 4)
+	UI.cells = {}
+	for i = 1, 25 do
+		local cell = CreateFrame("Button", nil, grid)
+		cell:SetSize(CELL_W, CELL_H)
+		local col, row = (i - 1) % 5, math.floor((i - 1) / 5)
+		cell:SetPoint("TOPLEFT", col * (CELL_W + GAP), -row * (CELL_H + GAP))
+		cell.index = i
+		cell.bg = cell:CreateTexture(nil, "BACKGROUND")
+		cell.bg:SetAllPoints()
+		local hl = cell:CreateTexture(nil, "HIGHLIGHT")
+		hl:SetAllPoints()
+		hl:SetColorTexture(1, 1, 1, 0.12)
+		cell.text = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		cell.text:SetPoint("TOPLEFT", 4, -4)
+		cell.text:SetPoint("BOTTOMRIGHT", -4, 14)
+		cell.text:SetJustifyH("CENTER")
+		cell.text:SetJustifyV("MIDDLE")
+		cell.text:SetWordWrap(true)
+		cell.progress = cell:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		cell.progress:SetPoint("BOTTOM", 0, 3)
+		cell:SetScript("OnClick", function(self)
+			if self.goalID ~= "free" and ns.Toggle(self.goalID) then
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+			end
+		end)
+		cell:SetScript("OnEnter", cellTooltip)
+		cell:SetScript("OnLeave", GameTooltip_Hide)
+		UI.cells[i] = cell
+	end
+
+	local side = CreateFrame("Frame", nil, f)
+	side:SetPoint("TOPLEFT", grid, "TOPRIGHT", 12, 0)
+	side:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 12)
+	f.side = side
+	local head = side:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	head:SetPoint("TOPLEFT")
+	head:SetText(L.GUILD)
+	UI.rows = {}
+	for i = 1, LIST_ROWS do
+		local row = side:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		row:SetPoint("TOPLEFT", 0, -6 - i * 16)
+		row:SetWidth(SIDE_W)
+		row:SetJustifyH("LEFT")
+		UI.rows[i] = row
+	end
+	f.note = side:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	f.note:SetPoint("TOPLEFT", 0, -16 - (LIST_ROWS + 1) * 16)
+	f.note:SetWidth(SIDE_W)
+	f.note:SetJustifyH("LEFT")
+	f.note:SetWordWrap(true)
+
+	f.announce = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.announce:SetSize(SIDE_W, 24)
+	f.announce:SetPoint("BOTTOM")
+	f.announce:SetText(L.ANNOUNCE)
+	f.announce:SetScript("OnClick", function()
+		-- only ever from this click: the addon never writes in chat by itself
+		C_ChatInfo.SendChatMessage(L.ANNOUNCE_TEXT:format(ns.CountMarks(ns.Marks())), "GUILD")
+		f.announce:Disable()
+	end)
+
+	f:SetScript("OnShow", function()
+		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+		UI.Refresh()
+	end)
+	f:SetScript("OnHide", function()
+		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+	end)
+	return f
+end
+
+local function paint(tex, c)
+	tex:SetColorTexture(c[1], c[2], c[3], c[4])
+end
+
+function UI.Refresh()
+	local f = UI.frame
+	if not f or not f:IsShown() then
+		return
+	end
+	local _, resetAt = ns.Week()
+	f.week:SetText(L.WEEK_UNTIL:format(date("%d/%m %H:%M", resetAt)))
+	local card = ns.Card()
+	local marks = ns.Marks(card)
+	local lines, inLine = ns.Lines(marks)
+	local count = ns.CountMarks(marks)
+	if lines > 1 then
+		f.status:SetText(L.BINGO_LINES:format(lines))
+	elseif lines == 1 then
+		f.status:SetText(L.BINGO)
+	else
+		f.status:SetText(L.MARKED:format(count))
+	end
+	for i, cell in ipairs(UI.cells) do
+		local id = card[i]
+		cell.goalID = id
+		local done = marks:sub(i, i) == "1"
+		if id == "free" then
+			cell.text:SetText(L.FREE)
+			cell.progress:SetText("")
+			paint(cell.bg, inLine[i] and COLORS.line or COLORS.free)
+		else
+			local g = ns.GOAL[id]
+			cell.text:SetText(ns.GoalText(g))
+			if g.count and g.need > 1 and not done then
+				cell.progress:SetText(ns.Progress(g) .. "/" .. g.need)
+			else
+				cell.progress:SetText("")
+			end
+			paint(cell.bg, inLine[i] and COLORS.line or done and COLORS.done or COLORS.todo)
+		end
+	end
+
+	-- the guild, best cards first
+	local list = {}
+	for sender, c in pairs(ns.GuildCards()) do
+		list[#list + 1] = { name = sender, lines = ns.Lines(c.m), marks = ns.CountMarks(c.m) }
+	end
+	table.sort(list, function(a, b)
+		if a.lines ~= b.lines then
+			return a.lines > b.lines
+		end
+		if a.marks ~= b.marks then
+			return a.marks > b.marks
+		end
+		return a.name < b.name
+	end)
+	for i, row in ipairs(UI.rows) do
+		local e = list[i]
+		if e then
+			row:SetText(e.name .. "  " .. e.marks .. (e.lines > 0 and ("  |cffffd100" .. L.BINGO .. "|r") or ""))
+		else
+			row:SetText("")
+		end
+	end
+	local _, inGuild = ns.Scope()
+	if not inGuild then
+		f.note:SetText(L.NO_GUILD)
+	elseif ns.IsTrial() then
+		f.note:SetText(L.TRIAL)
+	elseif #list == 0 then
+		f.note:SetText(L.NOBODY)
+	else
+		f.note:SetText("")
+	end
+	f.announce:SetShown(inGuild and lines > 0)
+	f.announce:SetEnabled(true)
+end
+
+function UI.Toggle()
+	local f = UI.frame or build()
+	f:SetShown(not f:IsShown())
+end
+
+ns.On("card", UI.Refresh)
+ns.On("guild", UI.Refresh)

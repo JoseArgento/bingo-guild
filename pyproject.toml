@@ -1,0 +1,11 @@
+# Bingo de la Guild is a WoW addon; Python is only used for its tests and tools.
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

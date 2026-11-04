@@ -1,0 +1,20 @@
+## Interface: 16001
+## Title: Bingo de la Guild
+## Notes: A weekly bingo card of fun goals, shared with your guild.
+## Notes-esES: Un cartón de bingo semanal con metas divertidas, compartido con tu guild.
+## Notes-esMX: Un cartón de bingo semanal con metas divertidas, compartido con tu guild.
+## Author: José Argento
+## Version: @project-version@
+## SavedVariables: BingoDeLaGuildDB
+## IconTexture: Interface\Icons\INV_Misc_Note_02
+## AddonCompartmentFunc: BingoDeLaGuild_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: BingoDeLaGuild_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: BingoDeLaGuild_OnAddonCompartmentLeave
+## Category: Roleplay
+
+Locales.lua
+Goals.lua
+Core.lua
+Sync.lua
+UI.lua
+Events.lua

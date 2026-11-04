@@ -1,0 +1,7 @@
+package-as: BingoDeLaGuild
+
+ignore:
+  - tests
+  - tools
+  - pyproject.toml
+  - README.en.md
