@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
-Officers' cards with their own goals, a league over the last weeks, seven Forever goals (pool version 2), a new-week notice.
+First version, for WoW Forever 1.60.1.
 
-First version: a weekly 5x5 card drawn from 43 goals (17 mark themselves), the same card for the whole guild, cards shared over addon messages, a guild ranking, and an "announce in guild" button.
+- A weekly 5x5 card, the same for the whole guild, drawn from 43 goals (17 mark themselves, seven are new to Forever: camping, blueprints, transmog, the new dungeons...).
+- Cards shared over validated, rate-limited addon messages; marks only compared between players with the same card.
+- Officers can write their own goals for the week and publish them; everyone's card gets them.
+- League over the last weeks, bingo alerts, an "announce in guild" button (only on click), a new-week notice.
+- Trial accounts listen without sending; throttled sends are retried.
