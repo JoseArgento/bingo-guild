@@ -4,6 +4,15 @@ Un cartón de bingo por semana para jugar con tu guild en **WoW Forever**. Son 2
 
 [Read in English](README.en.md)
 
+**Contenido**
+
+- [Cómo se juega](#cómo-se-juega)
+- [Instalar](#instalar)
+- [Qué manda y qué recibe](#qué-manda-y-qué-recibe)
+- [Cómo se probó](#cómo-se-probó)
+- [Desarrollo](#desarrollo)
+- [Apoyar](#apoyar)
+
 ## Cómo se juega
 
 - Se abre con `/bingo` o desde el botón de addons junto al minimapa.
@@ -56,5 +65,9 @@ python tools/check_api.py --bir ../BlizzardInterfaceResources --ui ../wow-ui-sou
 Si cambiás la lista de metas (`Goals.lua`), subí `POOL_VERSION`: el cartón sale de esa lista, y dos versiones distintas mostrarían cartones distintos. Un test te frena si te olvidás.
 
 Un tag `v*` empaqueta el addon con el packager de BigWigs (`.github/workflows/release.yml`).
+
+## Apoyar
+
+Todo esto es gratis y de código abierto, y va a seguir así: no hay funciones pagas ni nada antes para quien aporta. Si te sirvió y querés bancar el tiempo de mantenerlo (con cada parche de Blizzard hay que actualizar los datos y arreglar lo que se rompe), podés hacerlo en [Patreon](https://www.patreon.com/cw/DoblePupi). Gracias ♥
 
 Sin relación con Blizzard Entertainment. World of Warcraft es marca registrada de Blizzard Entertainment, Inc. Licencia MIT.

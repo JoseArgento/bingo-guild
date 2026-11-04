@@ -4,6 +4,9 @@ move-folders:
   BingoDeLaGuild/BingoDeLaGuild: BingoDeLaGuild
 
 ignore:
+  # README.md has the Patreon link, and an addon folder must not ask for donations: it stays on GitHub
+  - README.md
+  - docs
   - tests
   - tools
   - pyproject.toml
