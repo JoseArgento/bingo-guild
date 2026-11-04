@@ -72,6 +72,8 @@ def main() -> int:
             known_globals.add(f"{owner}.{method}")
             known_methods.add(method)
         known_methods |= set(table_field.findall(text))
+        # tooltip setters made from a table: SetItemByID = "GetItemByID" (TooltipDataHandler.lua)
+        known_methods |= set(re.findall(r'^\s*(Set\w+)\s*=\s*"Get\w+"', text, re.M))
     for p in args.ui.rglob("*.xml"):
         known_globals |= set(xml_name.findall(p.read_text(encoding="utf-8", errors="replace")))
     fields = set()  # names assigned as table fields anywhere in Blizzard's code (ScrollBoxConstants.RetainScrollPosition)
