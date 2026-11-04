@@ -35,6 +35,7 @@ local function groupHasGuildmate()
 end
 
 local currentWeek, currentScope
+local lastDeath, zonePending
 
 local function checkCard()
 	local week, scope = ns.Week(), ns.Scope()
@@ -53,6 +54,12 @@ end
 
 local handlers = {
 	PLAYER_DEAD = function()
+		-- fires twice for one death in Forever (reported in the beta, 1.60.1)
+		local now = GetTime()
+		if lastDeath and now - lastDeath < 5 then
+			return
+		end
+		lastDeath = now
 		ns.Count("die")
 	end,
 	PLAYER_LEVEL_UP = function()
@@ -72,7 +79,15 @@ local handlers = {
 		end
 	end,
 	ZONE_CHANGED_NEW_AREA = function()
-		ns.Count("zone", GetRealZoneText())
+		-- right after a hearthstone, flight or portal the zone text can be the old one or empty: read it later
+		if zonePending then
+			return
+		end
+		zonePending = true
+		C_Timer.After(2, function()
+			zonePending = false
+			ns.Count("zone", GetRealZoneText())
+		end)
 	end,
 	DUEL_FINISHED = function()
 		ns.Count("duel")

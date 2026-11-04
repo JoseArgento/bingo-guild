@@ -196,9 +196,12 @@ def test_lines(me, squares, lines):
 def test_deaths_levels_and_quests_count(me):
     for _ in range(3):
         me.fire("PLAYER_DEAD")
+        me.fire("PLAYER_DEAD")  # Forever fires it twice per death (beta report)
+        me.run("MOCK.gametime = MOCK.gametime + 60")
     me.fire("PLAYER_LEVEL_UP", 11)
     for _ in range(10):
         me.fire("QUEST_TURNED_IN", 176, 0, 0)
+    assert me.ns.ThisWeek().count.die == 3
     assert me.done("die1") and me.done("die3")
     assert me.done("lvl1") and not me.done("lvl3")
     assert me.done("q10") and not me.done("q25")
@@ -208,9 +211,12 @@ def test_zones_and_days_count_once_each(me):
     for zone in ["Elwynn Forest", "Elwynn Forest", "Westfall", "Duskwood", "Redridge Mountains"]:
         me.run(f"MOCK.where.zone = '{zone}'")
         me.fire("ZONE_CHANGED_NEW_AREA")
+        me.timers()
     assert not me.done("zone5")  # Elwynn twice: 4 zones
     me.run("MOCK.where.zone = 'Stormwind City'")
     me.fire("ZONE_CHANGED_NEW_AREA")
+    assert not me.done("zone5")  # read a moment later, not right away
+    me.timers()
     assert me.done("zone5")
     me.run("MOCK.resetAt = MOCK.now + 5 * 86400")  # three days in the same week
     me.m.tick()
@@ -316,6 +322,18 @@ def test_bingo_is_called_once_per_new_line(me):
     if not me.done(card[5]):
         me.ns.Toggle(card[5])
     assert len(me.warnings()) == 1
+
+
+def test_joining_a_guild_does_not_call_a_false_bingo():
+    c = Client("Nuevo", guild=None).login()
+    for g in ["fall", "guard", "lost", "dance", "fishjunk", "helplow", "five", "photo", "ghost", "bags"]:
+        c.ns.Toggle(g)
+    before = len(c.warnings())
+    c.run("MOCK.guild = { name = 'Los Del Fondo', realm = 'Forever' }")
+    c.fire("PLAYER_GUILD_UPDATE")
+    c.ns.Toggle("escort")  # any change on the new card
+    assert len(c.warnings()) == before  # the first change on the guild's card never calls bingo
+    assert c.ns.ThisWeek().linesCard.startswith("g:")
 
 
 def mark_row(c: Client, row: int):

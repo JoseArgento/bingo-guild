@@ -204,7 +204,11 @@ local BINGO_COLOR = { r = 1, g = 0.82, b = 0 }
 local function changed()
 	local w = ns.ThisWeek()
 	local lines = ns.Lines(ns.Marks())
-	if lines > (w.lines or 0) then
+	local card = ns.Scope()
+	if w.linesCard ~= card then
+		-- another card (you joined or left a guild): its lines are not new news
+		w.linesCard, w.lines = card, lines
+	elseif lines > (w.lines or 0) then
 		RaidWarningUtil.AddMessage(L.YOU_BINGO, BINGO_COLOR)
 		PlaySound(SOUNDKIT.RAID_WARNING)
 	end

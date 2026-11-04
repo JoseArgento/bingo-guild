@@ -118,11 +118,7 @@ def main() -> int:
                     continue
             if first in known_globals and "." not in r.name:
                 continue
-            if (
-                first in known_globals
-                and r.name.split(".")[-1] in fields
-                and not first.startswith("C_")
-            ):
+            if first in known_globals and r.name.split(".")[-1] in fields and not first.startswith("C_"):
                 continue
             missing.append(f"{rel}:{r.tok.line}: global {r.name}")
         for m in re.finditer(r":(\w+)\s*\(", text):
