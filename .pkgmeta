@@ -1,5 +1,8 @@
 package-as: BingoDeLaGuild
 
+move-folders:
+  BingoDeLaGuild/BingoDeLaGuild: BingoDeLaGuild
+
 ignore:
   - tests
   - tools
