@@ -8,11 +8,14 @@ Un cartón de bingo por semana para jugar con tu guild en **WoW Forever**. Son 2
 
 - Se abre con `/bingo` o desde el botón de addons junto al minimapa.
 - **Metas que se marcan solas** (17): morir, subir de nivel, matar un jefe, entregar misiones, pisar zonas nuevas, un duelo, mandar una carta, un vuelo, hacer grupo con alguien de la guild, un ítem azul o mejor, un PNJ raro, jugar varios días, pasar por la subasta, una captura en grupo.
-- **Metas que marcás vos** (19): las que el juego no puede saber, como "que te mate un guardia" o "bailar en una taberna". Clic para marcar, otro clic para desmarcar. Es un juego entre amigos: va de palabra.
+- **Metas que marcás vos** (26), entre ellas siete de Forever (armar un campamento, conseguir un plano, transfigurar algo, hacer una de las mazmorras nuevas…): las que el juego no puede saber, como "que te mate un guardia" o "bailar en una taberna". Clic para marcar, otro clic para desmarcar. Es un juego entre amigos: va de palabra.
 - **Bingo:** una fila, una columna o una diagonal completa. Te avisa en el centro de la pantalla, y aparece un botón para anunciarlo en el chat de la guild (solo si lo apretás).
 - **El cartón cambia con el reinicio semanal**, a la misma hora para todo el reino.
 - Pasando el mouse por una casilla ves quiénes de la guild ya la tienen.
 - `/bingo sync` le vuelve a pedir los cartones a la guild.
+- **Liga:** el botón "Liga" (o `/bingo liga`) suma los puntos de las últimas semanas: uno por casilla y 5 más por línea.
+- **Cartón de los oficiales:** un oficial puede escribir metas propias para la semana (botón "Agregar meta" o `/bingo meta <texto>`, hasta 24 de 50 letras) y publicarlas ("Publicar cartón" o `/bingo publicar`). El cartón de toda la guild pasa a tener esas metas, completado con metas de la lista. Solo se acepta de quien en el roster de la guild tiene el rango del líder o el de abajo.
+- Cuando arranca una semana nueva, te avisa en el chat.
 
 Sin guild también anda: el cartón es solo tuyo.
 
@@ -22,8 +25,8 @@ Copiá la carpeta `BingoDeLaGuild` a `Interface\AddOns\`, dentro de la carpeta d
 
 ## Qué manda y qué recibe
 
-- **Manda** por el canal de la guild, y nada más, un texto corto así: `C|1|1762300800|0000011111001000000000000` (versión, semana, y un 1 por cada casilla marcada). Lo manda al entrar, un ratito después de que marcás algo y cuando alguien de la guild lo pide.
-- **Recibe** solo de la guild. Lo que llega se lee con patrones y se guarda como texto: el addon nunca ejecuta nada de lo que recibe. Descarta mensajes de otro canal, mal formados, de otra semana, demasiado largos o tuyos, acepta como mucho 5 mensajes cada 10 segundos por persona y guarda hasta 1000 cartones (el tope de una guild).
+- **Manda** por el canal de la guild, y nada más, un texto corto así: `C|2|1762300800|3fa9c1|0000011111001000000000000` (versión, semana, qué cartón es, y un 1 por cada casilla marcada). Las marcas solo se comparan entre quienes tienen el mismo cartón. Los oficiales mandan además su cartón: una línea por meta. Lo manda al entrar, un ratito después de que marcás algo y cuando alguien de la guild lo pide.
+- **Recibe** solo de la guild. Lo que llega se lee con patrones y se guarda como texto: el addon nunca ejecuta nada de lo que recibe. Descarta mensajes de otro canal, mal formados, de otra semana, demasiado largos o tuyos, acepta como mucho 5 mensajes cada 10 segundos por persona (40 por minuto para el cartón de un oficial) y guarda hasta 1000 cartones (el tope de una guild). Las metas de los oficiales se guardan sin el carácter `|` (el que usa el juego para colores y links) ni caracteres de control, y cortadas a 50 letras.
 - **Nunca escribe en el chat por su cuenta.** El anuncio de bingo sale solo cuando apretás el botón.
 - **Cuentas de prueba:** Forever no las deja mandar mensajes de addon. El addon se da cuenta, no intenta mandar y te avisa: vos ves los cartones de la guild, ellos no ven el tuyo.
 - Si el juego frena los mensajes (por cantidad, o porque en ese momento restringe el chat), lo vuelve a intentar más tarde.
@@ -33,12 +36,13 @@ Copiá la carpeta `BingoDeLaGuild` a `Interface\AddOns\`, dentro de la carpeta d
 **Probado:**
 - ✅ **Cada función, evento y template existe en Forever 1.60.1**, revisado con `tools/check_api.py` contra los dumps de [Ketho/BlizzardInterfaceResources](https://github.com/Ketho/BlizzardInterfaceResources) y el código de la UI de [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source), rama `forever`. Por ejemplo: en Forever no existe `SendChatMessage` suelto, es `C_ChatInfo.SendChatMessage`; `CHAT_MSG_ADDON` no trae valores secretos; `C_ChatInfo.InChatMessagingLockdown` existe.
 - ✅ [forever-lint](https://github.com/JoseArgento/forever-lint): solo la nota FL012 (cuentas de prueba), que el addon ya maneja. [Addon Sentry](https://github.com/JoseArgento/addon-sentry): "Sin señales de riesgo".
-- ✅ **57 tests** en Lua 5.1 (el Lua de WoW) con un reemplazo chico del cliente. Corren **dos o más clientes a la vez** y se pasan los mensajes, así que la sincronización se prueba de punta a punta: cartón igual para toda la guild, cartón nuevo cada semana, cada meta automática, bingo por filas, columnas y diagonales, un recién llegado que pide los cartones, muchas preguntas con una sola respuesta, mensajes malos o con código adentro, inundación de mensajes, tope de 1000, cuenta de prueba, sin guild, reintento cuando el juego frena los mensajes, guardar y cargar, y la ventana.
+- ✅ **75 tests** en Lua 5.1 (el Lua de WoW) con un reemplazo chico del cliente. Corren **dos o más clientes a la vez** y se pasan los mensajes, así que la sincronización se prueba de punta a punta: cartón igual para toda la guild, cartón nuevo cada semana, cada meta automática, bingo por filas, columnas y diagonales, un recién llegado que pide los cartones, muchas preguntas con una sola respuesta, el cartón de un oficial (que solo valga si el roster dice que es oficial, que no se use a medias, que uno viejo no pise uno nuevo, que el que llega tarde lo reciba), la liga, mensajes malos o con código adentro, inundación de mensajes, tope de 1000, cuenta de prueba, sin guild, reintento cuando el juego frena los mensajes, guardar y cargar, y la ventana.
 
 **Sin probar ⏳** (no tengo el cliente de Forever):
 - Cómo se ve la ventana.
 - Que `C_DateAndTime.GetSecondsUntilWeeklyReset` dé el reinicio de Forever. Si no da nada, el addon usa semanas de lunes a lunes (UTC).
 - Que los eventos de las metas automáticas salten como en el resto de los clientes (`ENCOUNTER_END` en las mazmorras de Forever, `PLAYER_CONTROL_LOST` al tomar un vuelo).
+- Que `GetGuildRosterInfo` devuelva el índice de rango en tercer lugar, como en el resto de los clientes (la UI de Forever no lo usa, así que no lo pude ver en su código).
 - Que el botón de anunciar pueda escribir en la guild (`C_ChatInfo.SendChatMessage` tiene restricciones; se llama solo desde el clic).
 
 ## Desarrollo

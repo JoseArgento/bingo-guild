@@ -17,6 +17,30 @@ local COLORS = {
 
 local UI = {}
 ns.UI = UI
+UI.view = "week" -- or "league"
+
+StaticPopupDialogs.BINGODELAGUILD_GOAL = {
+	text = "%s",
+	button1 = ACCEPT,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 50,
+	OnShow = function(dialog)
+		dialog:GetEditBox():SetText("")
+		dialog:GetEditBox():SetFocus()
+	end,
+	OnAccept = function(dialog)
+		ns.AddDraft(dialog:GetEditBox():GetText())
+	end,
+	EditBoxOnEnterPressed = function(editBox)
+		local dialog = editBox:GetParent()
+		ns.AddDraft(editBox:GetText())
+		dialog:Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
 
 local function names(list, max)
 	if #list <= max then
@@ -37,8 +61,12 @@ local function cellTooltip(cell)
 		GameTooltip:Show()
 		return
 	end
-	local g = ns.GOAL[id]
+	local g = ns.Goal(id)
 	GameTooltip:SetText(ns.GoalText(g), 1, 1, 1, 1, true)
+	if g.custom then
+		local card = ns.OfficerCard()
+		GameTooltip:AddLine(L.CARD_BY:format(card and card.by or "?"), 0.7, 0.7, 0.7)
+	end
 	if g.count then
 		GameTooltip:AddLine(ns.Done(id) and L.AUTO or L.AUTO_TOO, 0.7, 0.7, 0.7, true)
 		if g.need > 1 then
@@ -48,7 +76,7 @@ local function cellTooltip(cell)
 		GameTooltip:AddLine(L.MANUAL, 0.7, 0.7, 0.7, true)
 	end
 	local have = {}
-	for sender, c in pairs(ns.GuildCards()) do
+	for sender, c in pairs(ns.SameCard()) do
 		if c.m:sub(cell.index, cell.index) == "1" then
 			have[#have + 1] = sender
 		end
@@ -125,6 +153,7 @@ local function build()
 	local head = side:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	head:SetPoint("TOPLEFT")
 	head:SetText(L.GUILD)
+	f.head = head
 	UI.rows = {}
 	for i = 1, LIST_ROWS do
 		local row = side:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -138,6 +167,29 @@ local function build()
 	f.note:SetWidth(SIDE_W)
 	f.note:SetJustifyH("LEFT")
 	f.note:SetWordWrap(true)
+
+	f.league = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.league:SetSize(SIDE_W, 22)
+	f.league:SetPoint("BOTTOM", 0, 28)
+	f.league:SetScript("OnClick", function()
+		UI.view = UI.view == "league" and "week" or "league"
+		UI.Refresh()
+	end)
+
+	-- officers write this week's goals and publish them
+	f.addGoal = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.addGoal:SetSize(SIDE_W, 22)
+	f.addGoal:SetPoint("BOTTOM", f.league, "TOP", 0, 30)
+	f.addGoal:SetText(L.ADD_GOAL)
+	f.addGoal:SetScript("OnClick", function()
+		StaticPopup_Show("BINGODELAGUILD_GOAL", L.GOAL_PROMPT)
+	end)
+	f.publish = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.publish:SetSize(SIDE_W, 22)
+	f.publish:SetPoint("TOP", f.addGoal, "BOTTOM", 0, -4)
+	f.publish:SetScript("OnClick", function()
+		ns.Publish()
+	end)
 
 	f.announce = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
 	f.announce:SetSize(SIDE_W, 24)
@@ -169,7 +221,8 @@ function UI.Refresh()
 		return
 	end
 	local _, resetAt = ns.Week()
-	f.week:SetText(L.WEEK_UNTIL:format(date("%d/%m %H:%M", resetAt)))
+	local officer = ns.OfficerCard()
+	f.week:SetText(L.WEEK_UNTIL:format(date("%d/%m %H:%M", resetAt)) .. (officer and ("  ·  " .. L.CARD_BY:format(officer.by)) or ""))
 	local card = ns.Card()
 	local marks = ns.Marks(card)
 	local lines, inLine = ns.Lines(marks)
@@ -190,7 +243,7 @@ function UI.Refresh()
 			cell.progress:SetText("")
 			paint(cell.bg, inLine[i] and COLORS.line or COLORS.free)
 		else
-			local g = ns.GOAL[id]
+			local g = ns.Goal(id)
 			cell.text:SetText(ns.GoalText(g))
 			if g.count and g.need > 1 and not done then
 				cell.progress:SetText(ns.Progress(g) .. "/" .. g.need)
@@ -201,28 +254,40 @@ function UI.Refresh()
 		end
 	end
 
-	-- the guild, best cards first
+	-- the guild: this week's cards (same card as yours), or the league of the last weeks
 	local list = {}
-	for sender, c in pairs(ns.GuildCards()) do
-		list[#list + 1] = { name = sender, lines = ns.Lines(c.m), marks = ns.CountMarks(c.m) }
+	if UI.view == "league" then
+		f.head:SetText(L.LEAGUE_HEAD)
+		for _, e in ipairs(ns.League()) do
+			list[#list + 1] = { name = e.name, text = e.name .. "  " .. L.POINTS:format(e.points) }
+		end
+	else
+		f.head:SetText(L.GUILD)
+		for sender, c in pairs(ns.SameCard()) do
+			list[#list + 1] = { name = sender, lines = ns.Lines(c.m), marks = ns.CountMarks(c.m) }
+		end
+		table.sort(list, function(a, b)
+			if a.lines ~= b.lines then
+				return a.lines > b.lines
+			end
+			if a.marks ~= b.marks then
+				return a.marks > b.marks
+			end
+			return a.name < b.name
+		end)
+		for _, e in ipairs(list) do
+			e.text = e.name .. "  " .. e.marks .. (e.lines > 0 and ("  |cffffd100" .. L.BINGO .. "|r") or "")
+		end
 	end
-	table.sort(list, function(a, b)
-		if a.lines ~= b.lines then
-			return a.lines > b.lines
-		end
-		if a.marks ~= b.marks then
-			return a.marks > b.marks
-		end
-		return a.name < b.name
-	end)
 	for i, row in ipairs(UI.rows) do
-		local e = list[i]
-		if e then
-			row:SetText(e.name .. "  " .. e.marks .. (e.lines > 0 and ("  |cffffd100" .. L.BINGO .. "|r") or ""))
-		else
-			row:SetText("")
-		end
+		row:SetText(list[i] and list[i].text or "")
 	end
+	f.league:SetText(UI.view == "league" and L.WEEK_VIEW or L.LEAGUE)
+	local officerNow = ns.IAmOfficer()
+	f.addGoal:SetShown(officerNow)
+	f.publish:SetShown(officerNow)
+	f.publish:SetText(L.PUBLISH:format(#ns.Drafts()))
+	f.publish:SetEnabled(#ns.Drafts() > 0)
 	local _, inGuild = ns.Scope()
 	if not inGuild then
 		f.note:SetText(L.NO_GUILD)
@@ -240,6 +305,12 @@ end
 function UI.Toggle()
 	local f = UI.frame or build()
 	f:SetShown(not f:IsShown())
+end
+
+function UI.Show()
+	local f = UI.frame or build()
+	f:Show()
+	UI.Refresh()
 end
 
 ns.On("card", UI.Refresh)

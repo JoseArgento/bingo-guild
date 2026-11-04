@@ -27,12 +27,23 @@ function ns.InitDB()
 	db.version = 1
 	db.chars = type(db.chars) == "table" and db.chars or {}
 	db.guilds = type(db.guilds) == "table" and db.guilds or {}
+	db.officer = type(db.officer) == "table" and db.officer or {} -- [scope][week] = { by, ver, goals }
+	db.drafts = type(db.drafts) == "table" and db.drafts or {} -- [scope] = { "goal", ... } an officer is writing
+	db.settings = type(db.settings) == "table" and db.settings or {}
+	db.settings.officerRank = db.settings.officerRank or 1 -- cards are accepted from the leader (0) and rank 1
 	ns.db = db
 	local cutoff = time() - KEEP_DAYS * 86400
 	for _, char in pairs(db.chars) do
 		for week, w in pairs(char.weeks or {}) do
 			if type(w) ~= "table" or (w.t or 0) < cutoff then
 				char.weeks[week] = nil
+			end
+		end
+	end
+	for _, weeks in pairs(db.officer) do
+		for week, card in pairs(weeks) do
+			if type(card) ~= "table" or (card.t or 0) < cutoff then
+				weeks[week] = nil
 			end
 		end
 	end
@@ -93,33 +104,71 @@ local function seedOf(s)
 	return h == 0 and 1 or h
 end
 
+function ns.Hash(s)
+	return seedOf(s)
+end
+
+-- The card an officer published for this guild and week, if any: { by, ver, goals = { "text", ... } }.
+function ns.OfficerCard(scope, week)
+	scope, week = scope or ns.Scope(), week or ns.Week()
+	local byScope = ns.db and ns.db.officer and ns.db.officer[scope]
+	return byScope and byScope[week]
+end
+
 local cache = {}
--- The 25 squares: 24 goal ids drawn from the pool for this scope and week, and "free" in the middle (13).
+-- The 25 squares, with "free" in the middle (13). Without an officer's card: 24 goals drawn from the list
+-- for this scope and week, so everyone in the guild draws the same. With one: the officer's goals plus goals
+-- from the list up to 24, in an order drawn the same way for everyone.
 function ns.Card(scope, week)
 	scope, week = scope or ns.Scope(), week or ns.Week()
-	local key = ns.POOL_VERSION .. "|" .. scope .. "|" .. week
+	local officer = ns.OfficerCard(scope, week)
+	local key = ns.POOL_VERSION .. "|" .. scope .. "|" .. week .. "|" .. (officer and officer.ver or "")
 	if cache[key] then
 		return cache[key]
 	end
 	local seed = seedOf(key)
+	local function shuffle(ids)
+		for i = #ids, 2, -1 do
+			seed = (seed * 16807) % MOD
+			local j = seed % i + 1
+			ids[i], ids[j] = ids[j], ids[i]
+		end
+		return ids
+	end
 	local ids = {}
 	for i, g in ipairs(ns.GOALS) do
 		ids[i] = g.id
 	end
-	for i = #ids, 2, -1 do
-		seed = (seed * 16807) % MOD
-		local j = seed % i + 1
-		ids[i], ids[j] = ids[j], ids[i]
+	shuffle(ids)
+	local chosen = {}
+	if officer then
+		for i = 1, math.min(#officer.goals, 24) do
+			chosen[#chosen + 1] = "c" .. i
+		end
+	end
+	for _, id in ipairs(ids) do
+		if #chosen >= 24 then
+			break
+		end
+		chosen[#chosen + 1] = id
+	end
+	if officer then
+		shuffle(chosen)
 	end
 	local card = {}
 	for i = 1, 24 do
-		card[#card + 1] = ids[i]
+		card[#card + 1] = chosen[i]
 		if #card == 12 then
 			card[13] = "free"
 		end
 	end
 	cache[key] = card
 	return card
+end
+
+-- A short name for a card, so marks are only compared between players who have the same one.
+function ns.CardKey(card)
+	return string.format("%06x", ns.Hash(table.concat(card or ns.Card(), ",")) % 16777216)
 end
 
 -- This character's record for the current week.
@@ -148,7 +197,7 @@ function ns.Done(id)
 	if id == "free" then
 		return true
 	end
-	local g = ns.GOAL[id]
+	local g = ns.Goal(id)
 	if not g then
 		return false
 	end
@@ -213,6 +262,7 @@ local function changed()
 		PlaySound(SOUNDKIT.RAID_WARNING)
 	end
 	w.lines = lines
+	w.marks = ns.Marks() -- kept for the league table
 	ns.Fire("card")
 	if ns.ShareSoon then
 		ns.ShareSoon()
@@ -252,7 +302,7 @@ end
 
 -- Clicking a square. A goal that already counted itself done stays marked.
 function ns.Toggle(id)
-	local g = ns.GOAL[id]
+	local g = ns.Goal(id)
 	if not g then
 		return false
 	end
@@ -266,6 +316,53 @@ function ns.Toggle(id)
 	end
 	changed()
 	return true
+end
+
+-- Points of a card for the league: one per square and 5 more per full line.
+function ns.Points(marks)
+	return ns.CountMarks(marks) + 5 * ns.Lines(marks)
+end
+
+-- The league: everyone's points added up over the weeks kept (about the last five).
+-- { { name, points, weeks, bingos } }, best first. Yours come from your own record of each week.
+function ns.League()
+	local scope, inGuild = ns.Scope()
+	local totals = {}
+	local function add(name, marks)
+		local t = totals[name] or { name = name, points = 0, weeks = 0, bingos = 0 }
+		t.points = t.points + ns.Points(marks)
+		t.weeks = t.weeks + 1
+		if ns.Lines(marks) > 0 then
+			t.bingos = t.bingos + 1
+		end
+		totals[name] = t
+	end
+	if inGuild then
+		for _, senders in pairs(ns.db.guilds[scope] or {}) do
+			for sender, c in pairs(senders) do
+				if type(c) == "table" and type(c.m) == "string" and #c.m == 25 then
+					add(sender, c.m)
+				end
+			end
+		end
+	end
+	local char = ns.db.chars[ns.CharKey()]
+	for _, w in pairs(char and char.weeks or {}) do
+		if type(w.marks) == "string" and #w.marks == 25 then
+			add(ns.Me(), w.marks)
+		end
+	end
+	local out = {}
+	for _, t in pairs(totals) do
+		out[#out + 1] = t
+	end
+	table.sort(out, function(a, b)
+		if a.points ~= b.points then
+			return a.points > b.points
+		end
+		return a.name < b.name
+	end)
+	return out
 end
 
 function ns.Print(msg)

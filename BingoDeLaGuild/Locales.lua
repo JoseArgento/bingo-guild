@@ -24,8 +24,20 @@ local L = {
 	OTHER_VERSION = "%s has another version of the addon: their card is different.",
 	RESYNC = "Asked the guild for their cards.",
 	CANT_SEND = "Could not send your card right now; it will try again.",
-	HELP = "/bingo opens the card. /bingo sync asks the guild for their cards again.",
+	HELP = "/bingo opens the card. /bingo sync asks the guild for their cards again. /bingo liga shows the league. Officers: /bingo meta <text>, /bingo metas, /bingo borrar, /bingo publicar.",
 	COMPARTMENT = "Click to open your card.",
+	LEAGUE = "League",
+	WEEK_VIEW = "This week",
+	LEAGUE_HEAD = "League (last weeks)",
+	POINTS = "%d pts",
+	ADD_GOAL = "Add a goal",
+	GOAL_PROMPT = "A goal for this week's guild card (up to 50 letters):",
+	PUBLISH = "Publish card (%d)",
+	OFFICER_CARD = "%s published this week's guild card.",
+	CARD_BY = "card by %s",
+	NEW_CARD = "New week, new card! /bingo to see it.",
+	NOT_OFFICER = "Only officers can publish the guild's card.",
+	DRAFTS = "Goals for the card (%d): %s",
 }
 
 local es = {
@@ -51,8 +63,20 @@ local es = {
 	OTHER_VERSION = "%s tiene otra versión del addon: su cartón es distinto.",
 	RESYNC = "Le pedí a la guild sus cartones.",
 	CANT_SEND = "No pude mandar tu cartón ahora; lo vuelve a intentar.",
-	HELP = "/bingo abre el cartón. /bingo sync le vuelve a pedir los cartones a la guild.",
+	HELP = "/bingo abre el cartón. /bingo sync le vuelve a pedir los cartones a la guild. /bingo liga muestra la liga. Oficiales: /bingo meta <texto>, /bingo metas, /bingo borrar, /bingo publicar.",
 	COMPARTMENT = "Clic para abrir tu cartón.",
+	LEAGUE = "Liga",
+	WEEK_VIEW = "Esta semana",
+	LEAGUE_HEAD = "Liga (últimas semanas)",
+	POINTS = "%d pts",
+	ADD_GOAL = "Agregar meta",
+	GOAL_PROMPT = "Una meta para el cartón de la guild de esta semana (hasta 50 letras):",
+	PUBLISH = "Publicar cartón (%d)",
+	OFFICER_CARD = "%s publicó el cartón de la guild de esta semana.",
+	CARD_BY = "cartón de %s",
+	NEW_CARD = "¡Semana nueva, cartón nuevo! /bingo para verlo.",
+	NOT_OFFICER = "Solo los oficiales pueden publicar el cartón de la guild.",
+	DRAFTS = "Metas para el cartón (%d): %s",
 }
 
 local locale = GetLocale()

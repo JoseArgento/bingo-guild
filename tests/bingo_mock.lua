@@ -104,3 +104,25 @@ C_ChatInfo = {
 		table.insert(MOCK.chatSent, { text = text, chatType = chatType })
 	end,
 }
+
+-- Guild ranks: MOCK.officer says whether you are one; MOCK.roster lists { "Name-Realm", rankIndex }.
+MOCK.officer = false
+MOCK.roster = { { "Josecito-Forever", 2 }, { "Ana-Forever", 2 }, { "Lider-Forever", 0 }, { "Ofi-Forever", 1 } }
+MOCK.rosterRequests = 0
+C_GuildInfo = {
+	IsGuildOfficer = function()
+		return MOCK.officer
+	end,
+	GuildRoster = function()
+		MOCK.rosterRequests = MOCK.rosterRequests + 1
+	end,
+}
+function GetNumGuildMembers()
+	return #MOCK.roster
+end
+function GetGuildRosterInfo(i)
+	local r = MOCK.roster[i]
+	if r then
+		return r[1], "Rank" .. r[2], r[2]
+	end
+end

@@ -3,7 +3,7 @@ local _, ns = ...
 -- The goals a card is drawn from. Every player of a guild draws the same 24 for the week from this list, so
 -- the list is part of the card: change it (add, remove, reorder) and bump POOL_VERSION, or two versions of
 -- the addon would show different cards and compare marks that mean different things.
-ns.POOL_VERSION = 1
+ns.POOL_VERSION = 2 -- 2: goals of WoW Forever (camping, blueprints, the new dungeons...)
 
 -- count = the counter that marks it by itself (Events.lua), need = how many. No count: the player marks it.
 ns.GOALS = {
@@ -45,6 +45,14 @@ ns.GOALS = {
 	{ id = "wrongway", es = "Ir a la zona equivocada", en = "Go to the wrong zone" },
 	{ id = "gift", es = "Regalarle algo a alguien de la guild", en = "Give a guildmate a gift" },
 	{ id = "joke", es = "Hacer reír a la guild en el chat", en = "Make the guild laugh in chat" },
+	-- things that are new in Forever
+	{ id = "camp", es = "Armar un campamento", en = "Set up a campsite" },
+	{ id = "fire", es = "Descansar junto a una fogata con alguien", en = "Rest by a campfire with someone" },
+	{ id = "blueprint", es = "Conseguir un plano", en = "Get a blueprint" },
+	{ id = "wellfed", es = "Comer algo cocinado antes de pelear", en = "Eat something cooked before a fight" },
+	{ id = "transmog", es = "Transfigurar algo", en = "Transmog something" },
+	{ id = "newdungeon", es = "Hacer una de las mazmorras nuevas", en = "Run one of the new dungeons" },
+	{ id = "skyborne", es = "Agrupar con alguien Skyborne", en = "Group with a Skyborne" },
 }
 
 ns.GOAL = {}
@@ -56,4 +64,36 @@ end
 
 function ns.GoalText(g)
 	return ns.spanish and g.es or g.en
+end
+
+-- A goal by id: one of the list, or one an officer wrote for this week's card ("c1", "c2"...).
+function ns.Goal(id)
+	if ns.GOAL[id] then
+		return ns.GOAL[id]
+	end
+	local i = type(id) == "string" and tonumber(id:match("^c(%d+)$"))
+	local card = i and ns.OfficerCard and ns.OfficerCard()
+	local text = card and card.goals[i]
+	if text then
+		return { id = id, es = text, en = text, need = 1, custom = true }
+	end
+end
+
+-- An officer's goal as it may travel and be shown: no "|" (the message separator, and the game's escape
+-- character for colors and links), no control characters, at most 50 bytes without cutting a letter.
+function ns.CleanGoal(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	text = strtrim((text:gsub("|", ""):gsub("%c", " ")))
+	local out, n = {}, 0
+	for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		if n + #ch > 50 then
+			break
+		end
+		out[#out + 1] = ch
+		n = n + #ch
+	end
+	text = table.concat(out)
+	return text ~= "" and text or nil
 end

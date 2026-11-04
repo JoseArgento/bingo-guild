@@ -41,8 +41,12 @@ local function checkCard()
 	local week, scope = ns.Week(), ns.Scope()
 	if week ~= currentWeek or scope ~= currentScope then
 		local first = currentWeek == nil
+		local previousWeek = currentWeek
 		currentWeek, currentScope = week, scope
 		if not first then
+			if week ~= previousWeek then
+				ns.Print(L.NEW_CARD)
+			end
 			ns.Fire("card")
 		end
 		if ns.CanSend() then
@@ -168,7 +172,8 @@ end)
 
 SLASH_BINGODELAGUILD1 = "/bingo"
 SlashCmdList.BINGODELAGUILD = function(msg)
-	msg = strtrim((msg or ""):lower())
+	local raw = strtrim(msg or "")
+	msg = raw:lower()
 	if msg == "sync" then
 		if ns.CanSend() then
 			ns.AskGuild()
@@ -177,6 +182,24 @@ SlashCmdList.BINGODELAGUILD = function(msg)
 		else
 			local _, inGuild = ns.Scope()
 			ns.Print(inGuild and L.TRIAL or L.NO_GUILD)
+		end
+	elseif msg == "liga" or msg == "league" then
+		ns.UI.view = "league"
+		ns.UI.Show()
+	elseif msg:match("^meta ") then
+		if ns.IAmOfficer() then
+			ns.AddDraft(raw:sub(6)) -- as typed, not lowercased
+			ns.Print(L.DRAFTS:format(#ns.Drafts(), table.concat(ns.Drafts(), " · ")))
+		else
+			ns.Print(L.NOT_OFFICER)
+		end
+	elseif msg == "metas" then
+		ns.Print(L.DRAFTS:format(#ns.Drafts(), table.concat(ns.Drafts(), " · ")))
+	elseif msg == "borrar" then
+		ns.ClearDrafts()
+	elseif msg == "publicar" or msg == "publish" then
+		if not ns.Publish() then
+			ns.Print(ns.IAmOfficer() and L.DRAFTS:format(0, "") or L.NOT_OFFICER)
 		end
 	elseif msg == "help" or msg == "ayuda" then
 		ns.Print(L.HELP)

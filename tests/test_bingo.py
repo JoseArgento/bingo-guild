@@ -109,8 +109,9 @@ def deliver(src: Client, *dests: Client):
             d.receive(text, sender=f"{src.name}-Forever")
 
 
-def card_message(c: Client, marks: str | None = None, week: str | None = None, pool: int = 1):
-    return f"C|{pool}|{week or c.week()}|{marks or '0' * 12 + '1' + '0' * 12}"
+def card_message(c: Client, marks: str | None = None, week: str | None = None, pool: int = 2, key: str | None = None):
+    key = key or c.ns.CardKey()
+    return f"C|{pool}|{week or c.week()}|{key}|{marks or '0' * 12 + '1' + '0' * 12}"
 
 
 @pytest.fixture
@@ -164,9 +165,9 @@ def test_drawing_a_card_leaves_math_random_alone(me):
 def test_the_pool_is_versioned():
     """Changing the goals changes everyone's card: the version must go up with it (and this list too)."""
     ids = re.findall(r'\{ id = "(\w+)"', (ADDON / "Goals.lua").read_text(encoding="utf-8"))
-    expected = (TESTS / "pool_v1.txt").read_text(encoding="utf-8").split()
+    expected = (TESTS / "pool_v2.txt").read_text(encoding="utf-8").split()
     version = int(re.search(r"POOL_VERSION = (\d+)", (ADDON / "Goals.lua").read_text(encoding="utf-8")).group(1))
-    assert version == 1 and ids == expected, "goals changed: bump POOL_VERSION and add tests/pool_v<N>.txt"
+    assert version == 2 and ids == expected, "goals changed: bump POOL_VERSION and add tests/pool_v<N>.txt"
     assert len(set(ids)) == len(ids) >= 30
 
 
@@ -363,7 +364,7 @@ def test_a_newcomer_gets_the_cards_by_asking():
     ana = Client("Ana").login()
     ana.timers()
     sent = ana.take_sent()
-    assert any(t.startswith("Q|1|") for _, t, _ in sent)
+    assert any(t.startswith("Q|2|") for _, t, _ in sent)
     for _, text, _ in sent:
         jose.receive(text, sender="Ana-Forever")
     deliver(jose, ana)
@@ -374,7 +375,7 @@ def test_many_questions_get_one_answer(me):
     me.timers()
     me.take_sent()
     for who in ["Ana", "Beto", "Caro"]:
-        me.receive(f"Q|1|{me.week()}", sender=f"{who}-Forever")
+        me.receive(f"Q|2|{me.week()}", sender=f"{who}-Forever")
     me.timers()
     answers = [t for _, t, _ in me.take_sent() if t.startswith("C|")]
     assert len(answers) == 1
@@ -389,7 +390,7 @@ def test_marks_go_out_a_moment_after_a_click(me):
     me.timers()
     sent = me.take_sent()
     assert len(sent) == 1
-    assert sent[0] == ("BingoGuild1", f"C|1|{me.week()}|{me.marks()}", "GUILD")
+    assert sent[0] == ("BingoGuild1", f"C|2|{me.week()}|{me.ns.CardKey()}|{me.marks()}", "GUILD")
 
 
 @pytest.mark.parametrize(
@@ -398,18 +399,20 @@ def test_marks_go_out_a_moment_after_a_click(me):
         {"channel": "PARTY"},
         {"channel": "WHISPER"},
         {"prefix": "OtroAddon"},
-        {"text": "C|1|WEEK|0101"},  # too few marks
-        {"text": "C|1|WEEK|" + "0" * 25},  # the free square unmarked
-        {"text": "C|1|WEEK|" + "2" * 25},
-        {"text": "C|1|WEEK|" + "1" * 25 + "|os.exit()"},
+        {"text": "C|2|WEEK|KEY|0101"},  # too few marks
+        {"text": "C|2|WEEK|KEY|" + "0" * 25},  # the free square unmarked
+        {"text": "C|2|WEEK|KEY|" + "2" * 25},
+        {"text": "C|2|WEEK|KEY|" + "1" * 25 + "|os.exit()"},
+        {"text": "C|2|WEEK|zzzzzz|" + "1" * 25},  # not a card name
+        {"text": "C|2|WEEK|" + "1" * 25},  # no card name (version 1 style)
         {"text": "loadstring('x')()"},
-        {"text": "C|1|WEEK|" + "1" * 200},
-        {"text": "C|1|999|" + "1" * 25},  # another week
+        {"text": "C|2|WEEK|KEY|" + "1" * 200},
+        {"text": "C|2|999|KEY|" + "1" * 25},  # another week
         {"sender": "Josecito-Forever"},  # my own message coming back
     ],
 )
 def test_bad_messages_are_ignored(me, kwargs):
-    text = kwargs.pop("text", "C|1|WEEK|" + "1" * 25).replace("WEEK", me.week())
+    text = kwargs.pop("text", "C|2|WEEK|KEY|" + "1" * 25).replace("WEEK", me.week()).replace("KEY", me.ns.CardKey())
     me.receive(text, **kwargs)
     assert me.guild_cards() == {}
 
@@ -421,8 +424,8 @@ def test_secret_senders_are_ignored(me):
 
 
 def test_another_version_is_ignored_and_said_once(me):
-    me.receive(card_message(me, pool=2))
-    me.receive(card_message(me, pool=2))
+    me.receive(card_message(me, pool=1))
+    me.receive(card_message(me, pool=1))
     assert me.guild_cards() == {}
     assert sum("another version" in line for line in me.chat()) == 1
 
@@ -503,7 +506,7 @@ def test_the_weekly_reset_starts_a_clean_card(me):
     assert me.week() != old_week
     assert not me.done("die1") and not me.done("fall")
     me.timers()
-    assert any(t.startswith(f"Q|1|{me.week()}") for _, t, _ in me.take_sent())
+    assert any(t.startswith(f"Q|2|{me.week()}") for _, t, _ in me.take_sent())
 
 
 def test_saved_and_loaded():
@@ -590,3 +593,143 @@ def test_slash_sync_and_compartment(me):
     assert me.ns.UI.frame.IsShown(me.ns.UI.frame)
     g.BingoDeLaGuild_OnAddonCompartmentEnter(None, me.ns.UI.frame)
     g.BingoDeLaGuild_OnAddonCompartmentLeave()
+
+
+# officers' cards (#28) ---------------------------------------------------------------------------
+
+
+def officer(name="Ofi"):
+    c = Client(name).login()
+    c.run("MOCK.officer = true")
+    return c
+
+
+def publish(c, goals):
+    for g in goals:
+        c.lua.globals().SlashCmdList.BINGODELAGUILD("meta " + g)
+    c.lua.globals().SlashCmdList.BINGODELAGUILD("publicar")
+
+
+def test_only_officers_publish(me):
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("meta Bailar en Ventormenta")
+    assert list(me.ns.Drafts().values()) == []
+    assert not me.ns.Publish()
+    assert any("Only officers" in line for line in me.chat())
+
+
+def test_an_officers_goals_go_on_everyones_card():
+    ofi, ana = officer(), Client("Ana").login()
+    for c in (ofi, ana):
+        c.timers()
+        c.take_sent()
+    before = ana.ns.CardKey()
+    publish(ofi, ["Bailar en Ventormenta", "Pescar en Forjaz"])
+    card = ofi.card()
+    assert {"c1", "c2"} <= set(card) and card[12] == "free"
+    assert ofi.ns.GoalText(ofi.ns.Goal("c1")) == "Bailar en Ventormenta"  # as typed, not lowercased
+    deliver(ofi, ana)
+    assert ana.card() == card
+    assert ana.ns.CardKey() == ofi.ns.CardKey() != before
+    assert any("Ofi published this week's guild card" in line for line in ana.chat())
+
+
+def test_a_card_from_someone_who_is_not_an_officer_is_ignored():
+    fake, me = Client("Ana").login(), Client().login()
+    fake.run("MOCK.officer = true")  # thinks so, but the roster says rank 2
+    publish(fake, ["Darme todo tu oro"])
+    deliver(fake, me)
+    assert "c1" not in me.card()
+
+
+def test_unknown_senders_ask_for_the_roster(me):
+    week = me.week()
+    me.receive(f"K|2|{week}|123|1", sender="Nadie-Forever")
+    assert me.m.rosterRequests >= 1
+    assert me.ns.OfficerCard() is None
+
+
+def test_half_a_card_is_not_used(me):
+    week = me.week()
+    me.receive(f"K|2|{week}|123|2", sender="Ofi-Forever")
+    me.receive(f"G|2|{week}|123|1|Una sola", sender="Ofi-Forever")
+    assert me.ns.OfficerCard() is None
+    me.receive(f"G|2|{week}|123|2|La otra", sender="Ofi-Forever")
+    card = me.ns.OfficerCard()
+    assert list(card.goals.values()) == ["Una sola", "La otra"]
+
+
+@pytest.mark.parametrize("count", ["0", "25", "x"])
+def test_bad_card_sizes(me, count):
+    me.receive(f"K|2|{me.week()}|123|{count}", sender="Ofi-Forever")
+    me.receive(f"G|2|{me.week()}|123|1|Algo", sender="Ofi-Forever")
+    assert me.ns.OfficerCard() is None
+
+
+def test_an_older_card_does_not_replace_a_newer_one(me):
+    w = me.week()
+    for ver, text in [("200", "Nueva"), ("100", "Vieja")]:
+        me.receive(f"K|2|{w}|{ver}|1", sender="Lider-Forever")
+        me.receive(f"G|2|{w}|{ver}|1|{text}", sender="Lider-Forever")
+    assert list(me.ns.OfficerCard().goals.values()) == ["Nueva"]
+
+
+def test_goal_text_is_cleaned(me):
+    clean = me.ns.CleanGoal
+    assert clean("hola\nchau") == "hola chau"
+    assert clean("|cffff0000rojo|r") == "cffff0000rojor"
+    long = clean("ñ" * 40)  # 80 bytes: cut at 50 without breaking a letter
+    assert long == "ñ" * 25
+    assert clean("   ") is None
+
+
+def test_marks_on_another_card_are_not_compared():
+    me = Client().login()
+    me.receive(card_message(me, "1" * 25, key="abcdef"))
+    assert me.guild_cards()["Ana"] == "1" * 25  # kept...
+    assert dict(me.ns.SameCard().items()) == {}  # ...but not compared with yours
+    me.run("ns.UI.Toggle()")
+    assert me.ns.UI.rows[1].GetText(me.ns.UI.rows[1]) == ""
+
+
+def test_a_late_player_gets_the_officers_card():
+    ofi = officer()
+    publish(ofi, ["Bailar en Ventormenta"])
+    ofi.timers()
+    ofi.take_sent()
+    late = Client("Ana").login()
+    late.timers()
+    for _, text, _ in late.take_sent():
+        ofi.receive(text, sender="Ana-Forever")
+    deliver(ofi, late)
+    assert "c1" in late.card()
+
+
+def test_officer_buttons_only_for_officers():
+    for c, shown in [(Client().login(), False), (officer(), True)]:
+        c.run("ns.UI.Toggle()")
+        f = c.ns.UI.frame
+        assert bool(f.publish.IsShown(f.publish)) is shown
+        assert bool(f.addGoal.IsShown(f.addGoal)) is shown
+
+
+# league ------------------------------------------------------------------------------------------
+
+
+def test_the_league_adds_up_the_weeks():
+    me = Client().login()
+    mark_row(me, 0)  # the first row: 5 squares (plus the free one in the middle) and one line
+    me.receive(card_message(me, "1" * 25))  # Ana: 25 squares, 12 lines
+    me.run("MOCK.now = MOCK.resetAt + 60")
+    me.m.tick()
+    me.receive(card_message(me, "0" * 12 + "1" + "0" * 12))  # Ana's new week: just the free square
+    league = me.ns.League()
+    table = {league[i].name: (league[i].points, league[i].weeks) for i in range(1, len(league) + 1)}
+    assert table["Ana"] == (25 + 5 * 12 + 1, 2)
+    assert table["Josecito"] == (6 + 5, 1)  # last week: a row and the free square, one line; nothing this week yet
+    assert league[1].name == "Ana"
+
+
+def test_new_week_is_announced(me):
+    me.run("MOCK.now = MOCK.resetAt + 60")
+    me.m.tick()
+    assert any("New week, new card" in line for line in me.chat())

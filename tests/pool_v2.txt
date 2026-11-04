@@ -34,3 +34,10 @@ repair
 wrongway
 gift
 joke
+camp
+fire
+blueprint
+wellfed
+transmog
+newdungeon
+skyborne
