@@ -20,6 +20,8 @@ A weekly bingo card to play with your guild in **WoW Forever**: 24 small, slight
 
 **Tested**: every API it uses was checked against Forever 1.60.1's dumps and UI source (`tools/check_api.py`); forever-lint only shows notes the addon already handles (FL012 trial accounts, FL013 double PLAYER_DEAD and stale zone text); Addon Sentry finds no risk signals; 101 tests run two or more clients side by side in Lua 5.1 and pass messages between them. **In the client** (since launch): the book, the card, squares that mark themselves by level and zone, the league and the minimap button, with a single player. **Not seen yet**: a whole guild running it at once (other players' cards, the officers' card and suggestions were tested with several simulated clients), that `C_DateAndTime.GetSecondsUntilWeeklyReset` gives Forever's reset (otherwise it falls back to Monday-to-Monday UTC weeks), that the goal events fire as in other clients, that the announce button can post in guild chat, that `GetInstanceInfo()` gives the new dungeons' English names (on other locales those squares are clicked by hand), and that `UnitRace("player")` says "Skyborne".
 
+**If something breaks:** `/bingo errores` shows the addon's last error (the last 10 are kept, no popups) to copy into a GitHub issue. The "Errors" bookmark only shows while there is something kept.
+
 ## Support
 
 All of this is free and open source, and it stays that way: no paid features, nothing early for supporters. If it helped you and you want to cover the time it takes to keep it working (every Blizzard patch means refreshing the data and fixing what broke), you can do that on [Patreon](https://www.patreon.com/cw/DoblePupi). Thanks ♥

@@ -64,6 +64,8 @@ Copiá la carpeta `BingoDeLaGuild` (con su `Libs\Pergamino` adentro) a `Interfac
 - Que `GetGuildRosterInfo` devuelva el índice de rango en tercer lugar, como en el resto de los clientes.
 - Que el botón de anunciar pueda escribir en la guild (`C_ChatInfo.SendChatMessage` tiene restricciones; se llama solo desde el clic).
 
+**Si algo falla:** `/bingo errores` muestra el último error del addon (se guardan los últimos 10, sin popups) para copiarlo en un issue de GitHub. El marcador "Errores" aparece solo mientras hay algo guardado.
+
 ## Desarrollo
 
 ```bash

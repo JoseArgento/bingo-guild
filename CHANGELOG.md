@@ -2,6 +2,7 @@
 
 ## 0.2.0 (unreleased)
 
+- **Its own errors, kept** (Pergamino 5): a Lua error in a handler no longer reaches the player as a popup; it is kept in `BingoDeLaGuildDB.errors` (last 10), said once in the chat, and `/bingo errores` opens an "Errores" bookmark to copy it into a GitHub issue. The bookmark only shows while there is something kept.
 - **Minimap button** of our own (Pergamino 2): left click opens the card, right click the league, drag it around the minimap; `/bingo minimapa on|off`. Pergamino 2 also brings wider bookmarks (the labels fit on one line) and scroll bars only when the page overflows.
 - Without a guild (or with nobody else on the addon yet) the note sits right under "Your guild" instead of at the bottom of an empty list; "1 pt" and "1 goal imported" in the singular; clicking the book brings it over any other open book.
 - Fixed: `Bindings.xml` is no longer listed in the TOC (the game reads it by name; listed, it logged XML warnings), and `UnitName("player")` keeps to one value.

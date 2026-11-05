@@ -59,6 +59,20 @@ function ns.InitDB()
 			end
 		end
 	end
+	-- the addon's own errors, kept here and shown with /bingo errores (Pergamino.Guard)
+	db.errors = type(db.errors) == "table" and db.errors or {}
+	ns.guard = Pergamino.Guard(ADDON, db, {
+		slash = "/bingo",
+		chat = function()
+			ns.Print(L.ERR_NOTICE)
+		end,
+		L = { title = L.ERR_TITLE, empty = L.ERR_EMPTY, clear = L.ERR_CLEAR, copy = L.ERR_COPY },
+	})
+	ns.guard.OnError = function()
+		if ns.UI and ns.UI.ErrorsChanged then
+			ns.UI.ErrorsChanged()
+		end
+	end
 end
 
 function ns.Me()

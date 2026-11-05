@@ -192,6 +192,7 @@ local handlers = {
 	GUILD_ROSTER_UPDATE = checkCard,
 }
 
+local onSlash -- the /bingo handler, defined below; guarded once the saved variables are in
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
@@ -201,6 +202,8 @@ frame:SetScript("OnEvent", function(_, event, ...)
 			ns.InitDB()
 			ns.SetLanguage(ns.db.settings.lang)
 			frame:UnregisterEvent("ADDON_LOADED")
+			-- from here on a Lua error in a handler is kept, not thrown (see /bingo errores)
+			SlashCmdList.BINGODELAGUILD = ns.guard.Install(frame, onSlash)
 		end
 	elseif event == "PLAYER_LOGIN" then
 		C_ChatInfo.RegisterAddonMessagePrefix(ns.PREFIX)
@@ -222,7 +225,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 SLASH_BINGODELAGUILD1 = "/bingo"
-SlashCmdList.BINGODELAGUILD = function(msg)
+onSlash = function(msg)
 	local raw = strtrim(msg or "")
 	msg = raw:lower()
 	if msg == "sync" then
@@ -287,12 +290,16 @@ SlashCmdList.BINGODELAGUILD = function(msg)
 		else
 			ns.SetMinimapShown(ns.db.settings.minimap == false)
 		end
+	elseif msg == "errores" or msg == "errors" then
+		ns.UI.view = "errors"
+		ns.UI.Show()
 	elseif msg == "help" or msg == "ayuda" then
 		ns.Print(L.HELP)
 	else
 		ns.UI.Toggle()
 	end
 end
+SlashCmdList.BINGODELAGUILD = onSlash
 
 function BingoDeLaGuild_OnAddonCompartmentClick()
 	ns.UI.Toggle()

@@ -945,11 +945,12 @@ def test_the_exchange_window(me):
 def test_the_window_is_a_pergamino_book(me):
     me.run("ns.UI.Toggle()")
     f = me.ns.UI.frame
-    assert me.run("return Pergamino.VERSION") == 4
+    assert me.run("return Pergamino.VERSION") == 5
     assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
     assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
     assert f.title.GetText(f.title) == "Guild Bingo"
-    assert [k for k in f.tabOrder.values()] == ["carton", "liga", "oficiales"]
+    assert [k for k in f.tabOrder.values()] == ["carton", "liga", "oficiales", "errors"]
+    assert me.run("return BingoDeLaGuildFrame.tabs.errors:IsShown()") is False  # hidden until there is an error
     assert f.selected == "carton" and f.pages.carton.right.IsShown(f.pages.carton.right)
     assert not f.pages.liga.right.IsShown(f.pages.liga.right)
     # the fonts are the library's own, read from this addon's copy
@@ -1083,3 +1084,21 @@ def test_the_minimap_button_opens_the_card_and_remembers_where_it_was():
     again = Client(saved=me.m.savedVariables("BingoDeLaGuildDB")).login()
     b2 = again.lua.globals().BingoDeLaGuildMinimapButton
     assert b2._shown is False and b2.angle == 0
+
+
+def test_a_handler_error_is_kept_and_shown_not_thrown():
+    me = Client()
+    me.login()
+    # a broken handler in the event frame: the guard keeps the error instead of a popup
+    me.run("ns.Count = function() error('se rompio el conteo') end")
+    me.fire("PLAYER_LEVEL_UP", 14)  # does not raise
+    errs = me.run("return ns.db.errors")
+    assert len(errs) == 1 and "se rompio el conteo" in errs[1].message and errs[1].label == "PLAYER_LEVEL_UP"
+    assert sum(1 for line in me.m.chat.values() if "tuvo un error" in line or "had an error" in line) == 1
+    # /bingo errores opens the book on the errors bookmark, now showing, with the text to copy
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("errores")
+    f = me.run("return BingoDeLaGuildFrame")
+    assert f.selected == "errors" and me.run("return BingoDeLaGuildFrame.tabs.errors:IsShown()") is True
+    assert "se rompio el conteo" in me.run("return ns.UI.errors.area.box._text")
+    me.run("ns.UI.errors.clear:GetScript('OnClick')()")
+    assert me.run("return #ns.db.errors") == 0

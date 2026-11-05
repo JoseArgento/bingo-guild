@@ -284,7 +284,7 @@ local function build()
 		tab:SetScript("OnLeave", GameTooltip_Hide)
 	end
 	f.OnTab = function(key)
-		UI.view = key == "liga" and "league" or key == "oficiales" and "officers" or "week"
+		UI.view = key == "liga" and "league" or key == "oficiales" and "officers" or key == "errors" and "errors" or "week"
 		UI.Refresh()
 	end
 	f.OnMoved = function(point, _, relPoint, x, y)
@@ -410,6 +410,20 @@ local function build()
 		f:SetPoint(p[1], UIParent, p[2], p[3], p[4])
 	end
 	UI.Relabel()
+	-- the addon's own errors: a brown bookmark that only shows while there is something to copy
+	local errTab = f:AddTab("errors", L.ERR_TITLE, { color = P.BOOKMARK_ACTION_COLOR })
+	errTab.textKey = "ERR_TITLE"
+	errTab:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:SetText(L.ERR_TITLE)
+		GameTooltip:AddLine(L.ERR_TIP, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	errTab:SetScript("OnLeave", GameTooltip_Hide)
+	local errPage = f:AddPage("errors")
+	UI.errors = ns.guard.Page(errPage.right)
+	UI.ErrorsChanged()
+
 	return f
 end
 
@@ -440,10 +454,25 @@ function UI.Relabel()
 	end
 end
 
+-- The errors bookmark shows only while there are errors kept; the page follows the list.
+function UI.ErrorsChanged()
+	local f = UI.frame
+	if not f or not f.tabs.errors then
+		return
+	end
+	f.tabs.errors:SetShown(#ns.guard.Errors() > 0 or UI.view == "errors")
+	if UI.errors then
+		UI.errors.Refresh()
+	end
+end
+
 function UI.Refresh()
 	local f = UI.frame
 	if not f or not f:IsShown() then
 		return
+	end
+	if UI.view == "errors" then
+		UI.ErrorsChanged()
 	end
 	local _, resetAt = ns.Week()
 	local officer = ns.OfficerCard()
@@ -600,13 +629,13 @@ function UI.Toggle()
 		return
 	end
 	f:Show()
-	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or "carton")
+	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or UI.view == "errors" and "errors" or "carton")
 end
 
 function UI.Show()
 	local f = UI.frame or build()
 	f:Show()
-	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or "carton")
+	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or UI.view == "errors" and "errors" or "carton")
 	UI.Refresh()
 end
 
