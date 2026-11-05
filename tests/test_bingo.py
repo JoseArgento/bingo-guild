@@ -550,7 +550,8 @@ def test_the_window(me):
     for i, cell in enumerate(cells):
         if card[i] != "free":
             assert cell.text.GetText(cell.text) == me.ns.GoalText(me.ns.GOAL[card[i]])
-    assert "Ana" in ui.rows[1].GetText(ui.rows[1])
+    rows = ui.frame.guild.box.rows
+    assert "Ana" in rows[1].name.GetText(rows[1].name) and rows[1].count.GetText(rows[1].count) == "25 of 25"
     assert "BingoDeLaGuildFrame" in list(me.lua.globals().UISpecialFrames.values())
 
 
@@ -690,7 +691,7 @@ def test_marks_on_another_card_are_not_compared():
     assert me.guild_cards()["Ana"] == "1" * 25  # kept...
     assert dict(me.ns.SameCard().items()) == {}  # ...but not compared with yours
     me.run("ns.UI.Toggle()")
-    assert me.ns.UI.rows[1].GetText(me.ns.UI.rows[1]) == ""
+    assert len(me.ns.UI.frame.guild.box.rows) == 0
 
 
 def test_a_late_player_gets_the_officers_card():
@@ -917,3 +918,123 @@ def test_the_exchange_window(me):
     assert any("2 goals imported" in line for line in ofi.chat())
     me.lua.globals().SlashCmdList.BINGODELAGUILD("exportar")
     assert any("Only officers" in line for line in me.chat())
+
+
+# the book (Pergamino) ----------------------------------------------------------------------------
+
+
+def test_the_window_is_a_pergamino_book(me):
+    me.run("ns.UI.Toggle()")
+    f = me.ns.UI.frame
+    assert me.run("return Pergamino.VERSION") == 1
+    assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
+    assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
+    assert f.title.GetText(f.title) == "Guild Bingo"
+    assert [k for k in f.tabOrder.values()] == ["carton", "liga", "oficiales"]
+    assert f.selected == "carton" and f.pages.carton.right.IsShown(f.pages.carton.right)
+    assert not f.pages.liga.right.IsShown(f.pages.liga.right)
+    # the fonts are the library's own, read from this addon's copy
+    font = me.run("return PergaminoBody")
+    assert font.GetFont(font)[0].endswith("BingoDeLaGuild\\Libs\\Pergamino\\Fonts\\Alegreya-Regular.ttf")
+    # no Blizzard frame template anywhere in the window
+    assert f._template is None and f.close._template is None
+
+
+def test_bookmarks_turn_the_page_and_have_tooltips(me):
+    me.run("ns.UI.Toggle()")
+    f = me.ns.UI.frame
+    tab = f.tabs.liga
+    tab._scripts.OnClick(tab)
+    assert f.selected == "liga" and me.ns.UI.view == "league"
+    assert f.pages.liga.right.IsShown(f.pages.liga.right) and not f.pages.carton.right.IsShown(f.pages.carton.right)
+    assert f.tabs.liga.width == 142 and f.tabs.carton.width == 128  # the open bookmark sticks out more
+    tab._scripts.OnEnter(tab)
+    lines = me.run("return table.concat(GameTooltip.lines or {}, '\\n')")
+    assert "one per square" in lines
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("liga")
+    assert f.selected == "liga"
+
+
+def border(cell):
+    """The colour last given to a square's top edge (SetColorTexture r, g, b)."""
+    calls = cell.edges[1]._calls
+    last = calls[len(calls)]
+    return (last[2], last[3], last[4])
+
+
+def test_squares_are_stamped_todo_done_line_and_free(me):
+    me.run("ns.UI.Toggle()")
+    cells = me.ns.UI.cells
+    free = cells[13]
+    assert free.goalID == "free" and free.seal._shown and not free.wash._shown
+    todo = next(c for c in cells.values() if c.goalID != "free")
+    assert not todo.wash._shown and not todo.tick._shown and not todo.seal._shown
+    me.ns.Toggle(todo.goalID)
+    assert todo.wash._shown and todo.tick._shown
+    assert border(todo) == pytest.approx((0.58, 0.44, 0.12))  # gold-deep border
+    mark_row(me, 2)  # the free square's row: a line
+    assert free.wash._shown and border(free) == pytest.approx((0.56, 0.16, 0.11))  # crimson
+
+
+def test_officers_bookmark_only_for_officers():
+    plain, ofi = Client().login(), officer()
+    plain.run("ns.UI.Toggle()")
+    assert not plain.ns.UI.frame.tabs.oficiales.IsShown(plain.ns.UI.frame.tabs.oficiales)
+    ofi.run("ns.UI.Toggle()")
+    f = ofi.ns.UI.frame
+    assert f.tabs.oficiales.IsShown(f.tabs.oficiales)
+    f.tabs.oficiales._scripts.OnClick(f.tabs.oficiales)
+    assert f.selected == "oficiales" and f.publish.IsShown(f.publish)
+    assert "No goals written" in f.draftsNote.GetText(f.draftsNote)
+    ofi.lua.globals().SlashCmdList.BINGODELAGUILD("meta Bailar")
+    rows = f.drafts.box.rows
+    assert rows[1].name.GetText(rows[1].name) == "1. Bailar"
+    # losing the rank sends you back to the card
+    ofi.run("MOCK.officer = false")
+    ofi.fire("GUILD_ROSTER_UPDATE")
+    ofi.ns.UI.Refresh()
+    assert f.selected == "carton" and not f.tabs.oficiales.IsShown(f.tabs.oficiales)
+
+
+def test_empty_states_invite():
+    alone = Client(guild=None).login()
+    alone.run("ns.UI.Toggle()")
+    note = alone.ns.UI.frame.note
+    assert "not in a guild" in note.GetText(note) and "Join a guild" in note.GetText(note)
+    me = Client().login()
+    me.run("ns.UI.Toggle()")
+    note = me.ns.UI.frame.note
+    assert "Nobody else" in note.GetText(note) and "same card" in note.GetText(note)
+
+
+def test_the_language_can_be_chosen_on_any_client(me):
+    assert me.ns.GoalText(me.ns.GOAL["fall"]) == "Die from a fall" and me.ns.L.TITLE == "Guild Bingo"
+    me.run("ns.UI.Toggle()")
+    f = me.ns.UI.frame
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("idioma es")
+    assert me.ns.db.settings.lang == "es" and me.ns.spanish
+    assert me.ns.GoalText(me.ns.GOAL["fall"]) == "Morir de una caída"
+    assert f.title.GetText(f.title) == "Bingo de la Guild" and f.tabs.liga.GetText(f.tabs.liga) == "Liga"
+    assert any("Idioma: es" in line for line in me.chat())
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("idioma auto")
+    assert not me.ns.spanish and f.title.GetText(f.title) == "Guild Bingo"
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("idioma klingon")
+    assert any("/bingo idioma es | en | auto" in line for line in me.chat())
+    # the setting survives a relog
+    saved = Client(saved="BingoDeLaGuildDB = { settings = { lang = 'es' } }").login()
+    assert saved.ns.spanish and saved.ns.L.TITLE == "Bingo de la Guild"
+    # and an English choice on a Spanish client works the other way round
+    es = Client(locale="esES").login()
+    assert es.ns.spanish
+    es.lua.globals().SlashCmdList.BINGODELAGUILD("idioma en")
+    assert not es.ns.spanish and es.ns.L.TITLE == "Guild Bingo"
+
+
+def test_the_exchange_is_a_parchment_card(me):
+    ofi = officer()
+    ofi.lua.globals().SlashCmdList.BINGODELAGUILD("exportar")
+    f = ofi.ns.UI.exchange
+    assert f._template is None and f.body._template == "ScrollingEditBoxTemplate"
+    assert f.title.GetText(f.title) == "Export / import goals"
+    f.close._scripts.OnClick(f.close)
+    assert not f.IsShown(f)

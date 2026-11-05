@@ -1,23 +1,17 @@
 local ADDON, ns = ...
 local L = ns.L
+local P = Pergamino
 
--- The card window: 5x5 squares on the left, the guild's cards on the right. Built the first time it opens.
+-- The window is an open book (Libs/Pergamino): the 5x5 card is stamped on the left page, the guild, the
+-- league and the officers' tools take the right page, one bookmark each. Built the first time it opens.
 
-local CELL_W, CELL_H, GAP = 92, 66, 4
-local GRID_W = CELL_W * 5 + GAP * 4
-local SIDE_W = 140
-local LIST_ROWS = 12
-
-local COLORS = {
-	todo = { 0.08, 0.08, 0.1, 0.85 },
-	done = { 0.16, 0.42, 0.18, 0.9 },
-	line = { 0.62, 0.45, 0.08, 0.95 },
-	free = { 0.35, 0.28, 0.12, 0.9 },
-}
+local CELL_W, CELL_H, GAP = 70, 68, 4
+local GRID_W, GRID_H = CELL_W * 5 + GAP * 4, CELL_H * 5 + GAP * 4
+local BTN_W = 176
 
 local UI = {}
 ns.UI = UI
-UI.view = "week" -- or "league"
+UI.view = "week" -- "week" (the card and the guild), "league" or "officers": which bookmark is open
 
 StaticPopupDialogs.BINGODELAGUILD_GOAL = {
 	text = "%s",
@@ -149,150 +143,297 @@ local function cellTooltip(cell)
 	GameTooltip:Show()
 end
 
+local function tabTooltip(tab)
+	GameTooltip:SetOwner(tab, "ANCHOR_LEFT")
+	GameTooltip:SetText(tab:GetText())
+	GameTooltip:AddLine(L["TAB_" .. string.upper(tab.key) .. "_TIP"] or "", 1, 1, 1, true)
+	GameTooltip:Show()
+end
+
+-- a square of the card: an ink-bordered stamp on the parchment
+local function makeCell(grid, i)
+	local cell = CreateFrame("Button", nil, grid)
+	cell:SetSize(CELL_W, CELL_H)
+	local col, row = (i - 1) % 5, math.floor((i - 1) / 5)
+	cell:SetPoint("TOPLEFT", col * (CELL_W + GAP), -row * (CELL_H + GAP))
+	cell.index = i
+	cell.bg = cell:CreateTexture(nil, "BACKGROUND")
+	cell.bg:SetAllPoints()
+	cell.bg:SetColorTexture(0.23, 0.14, 0.07, 0.05)
+	cell.wash = cell:CreateTexture(nil, "BORDER")
+	cell.wash:SetAllPoints()
+	cell.wash:SetColorTexture(P.GOLD[1], P.GOLD[2], P.GOLD[3], 0.38)
+	cell.wash:Hide()
+	cell.edges = {}
+	for k, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+		local e = cell:CreateTexture(nil, "ARTWORK")
+		e:SetColorTexture(P.INK[1], P.INK[2], P.INK[3], 0.45)
+		if side == "TOP" or side == "BOTTOM" then
+			e:SetPoint(side .. "LEFT")
+			e:SetPoint(side .. "RIGHT")
+			e:SetHeight(1)
+		else
+			e:SetPoint("TOP" .. side)
+			e:SetPoint("BOTTOM" .. side)
+			e:SetWidth(1)
+		end
+		cell.edges[k] = e
+	end
+	local hl = cell:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetAllPoints()
+	hl:SetColorTexture(0.23, 0.14, 0.07, 0.08)
+	cell.text = P.Label(cell, "", "small", "CENTER")
+	cell.text:SetPoint("TOPLEFT", 4, -5)
+	cell.text:SetPoint("BOTTOMRIGHT", -4, 14)
+	cell.text:SetJustifyV("MIDDLE")
+	cell.text:SetWordWrap(true)
+	cell.progress = P.Label(cell, "", "muted", "CENTER")
+	cell.progress:SetPoint("BOTTOM", 0, 3)
+	cell.tick = cell:CreateTexture(nil, "OVERLAY")
+	cell.tick:SetSize(16, 16)
+	cell.tick:SetPoint("BOTTOMRIGHT", -3, 3)
+	cell.tick:SetTexture(P.MEDIA .. "check")
+	cell.tick:SetTexCoord(0.5, 1, 0, 1)
+	cell.tick:Hide()
+	cell.seal = cell:CreateTexture(nil, "ARTWORK", nil, 1)
+	cell.seal:SetSize(34, 34)
+	cell.seal:SetPoint("CENTER", 0, 6)
+	cell.seal:SetTexture(P.MEDIA .. "seal")
+	cell.seal:Hide()
+	cell:SetScript("OnClick", function(self)
+		if self.goalID ~= "free" and ns.Toggle(self.goalID) then
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		end
+	end)
+	cell:SetScript("OnEnter", cellTooltip)
+	cell:SetScript("OnLeave", GameTooltip_Hide)
+	return cell
+end
+
+-- how a square looks: todo, done, in a completed line, or the free one
+local function stamp(cell, state)
+	local ink, gold, crimson = P.INK, P.GOLD, P.CRIMSON
+	cell.wash:SetShown(state == "done" or state == "line")
+	cell.tick:SetShown(state == "done" or state == "line")
+	cell.seal:SetShown(state == "free")
+	if state == "line" then
+		cell.wash:SetColorTexture(gold[1], gold[2], gold[3], 0.6)
+	else
+		cell.wash:SetColorTexture(gold[1], gold[2], gold[3], 0.38)
+	end
+	local c, a = ink, 0.45
+	if state == "line" then
+		c, a = crimson, 0.9
+	elseif state == "done" then
+		c, a = P.GOLD_DEEP, 0.9
+	end
+	for _, e in ipairs(cell.edges) do
+		e:SetColorTexture(c[1], c[2], c[3], a)
+	end
+	if state == "free" then
+		cell.text:ClearAllPoints()
+		cell.text:SetPoint("BOTTOMLEFT", 2, 4)
+		cell.text:SetPoint("BOTTOMRIGHT", -2, 4)
+	else
+		cell.text:ClearAllPoints()
+		cell.text:SetPoint("TOPLEFT", 4, -5)
+		cell.text:SetPoint("BOTTOMRIGHT", -4, 14)
+	end
+end
+
+local function guildRow(row, item)
+	if not row.name then
+		row.name = P.Label(row, "", "body")
+		row.name:SetPoint("LEFT", 6, 0)
+		row.name:SetPoint("RIGHT", -110, 0)
+		row.count = P.Label(row, "", "strong", "RIGHT")
+		row.count:SetPoint("RIGHT", -6, 0)
+		row.tag = P.Tag(row, "", "achievement")
+		row.tag:SetPoint("RIGHT", row.count, "LEFT", -8, 0)
+	end
+	row.name:SetText(item.name)
+	row.count:SetText(item.right or "")
+	if item.lines and item.lines > 0 then
+		row.tag:Set(L.BINGO, "achievement")
+		row.tag:Show()
+	else
+		row.tag:Hide()
+	end
+end
+
+local function draftRow(row, item)
+	if not row.name then
+		row.name = P.Label(row, "", "body")
+		row.name:SetPoint("LEFT", 6, 0)
+		row.name:SetPoint("RIGHT", -6, 0)
+	end
+	row.name:SetText(item.text)
+end
+
 local function build()
 	local FRAME = ADDON .. "Frame"
-	local f = CreateFrame("Frame", FRAME, UIParent, "BasicFrameTemplateWithInset")
-	f:SetSize(14 + GRID_W + 12 + SIDE_W + 12, 440)
-	f:SetPoint("CENTER")
-	f:SetFrameStrata("HIGH")
-	f:SetToplevel(true)
-	f:SetClampedToScreen(true)
-	f:SetMovable(true)
-	f:EnableMouse(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	f:Hide()
-	f.TitleText:SetText(L.TITLE)
-	tinsert(UISpecialFrames, FRAME)
+	local f = P.Book(FRAME, { title = L.TITLE, width = 860, height = 540 })
 	UI.frame = f
+	f.TitleText = f.title -- as the old frame had it
+	for _, key in ipairs({ "carton", "liga", "oficiales" }) do
+		local tab = f:AddTab(key, L["TAB_" .. string.upper(key)])
+		tab.textKey = "TAB_" .. string.upper(key)
+		tab:SetScript("OnEnter", tabTooltip)
+		tab:SetScript("OnLeave", GameTooltip_Hide)
+	end
+	f.OnTab = function(key)
+		UI.view = key == "liga" and "league" or key == "oficiales" and "officers" or "week"
+		UI.Refresh()
+	end
+	f.OnMoved = function(point, _, relPoint, x, y)
+		ns.db.settings.point = { point, relPoint, x, y }
+	end
 
-	f.week = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	f.week:SetPoint("TOPLEFT", 16, -34)
-	f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	f.status:SetPoint("TOPLEFT", 16 + GRID_W - 200, -34)
-	f.status:SetWidth(200)
-	f.status:SetJustifyH("RIGHT")
-
-	local grid = CreateFrame("Frame", nil, f)
-	grid:SetPoint("TOPLEFT", 14, -58)
-	grid:SetSize(GRID_W, CELL_H * 5 + GAP * 4)
+	-- the left page: the card, on every bookmark
+	local left = f.left
+	f.week = P.Label(left, "", "heading")
+	f.week:SetPoint("TOPLEFT", 0, 0)
+	f.week:SetPoint("RIGHT", -90, 0)
+	f.week:SetWordWrap(false)
+	f.status = P.Label(left, "", "big", "RIGHT")
+	f.status:SetPoint("TOPRIGHT", 0, 2)
+	local grid = CreateFrame("Frame", nil, left)
+	grid:SetPoint("TOP", 0, -30)
+	grid:SetSize(GRID_W, GRID_H)
+	f.grid = grid
 	UI.cells = {}
 	for i = 1, 25 do
-		local cell = CreateFrame("Button", nil, grid)
-		cell:SetSize(CELL_W, CELL_H)
-		local col, row = (i - 1) % 5, math.floor((i - 1) / 5)
-		cell:SetPoint("TOPLEFT", col * (CELL_W + GAP), -row * (CELL_H + GAP))
-		cell.index = i
-		cell.bg = cell:CreateTexture(nil, "BACKGROUND")
-		cell.bg:SetAllPoints()
-		local hl = cell:CreateTexture(nil, "HIGHLIGHT")
-		hl:SetAllPoints()
-		hl:SetColorTexture(1, 1, 1, 0.12)
-		cell.text = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		cell.text:SetPoint("TOPLEFT", 4, -4)
-		cell.text:SetPoint("BOTTOMRIGHT", -4, 14)
-		cell.text:SetJustifyH("CENTER")
-		cell.text:SetJustifyV("MIDDLE")
-		cell.text:SetWordWrap(true)
-		cell.progress = cell:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-		cell.progress:SetPoint("BOTTOM", 0, 3)
-		cell:SetScript("OnClick", function(self)
-			if self.goalID ~= "free" and ns.Toggle(self.goalID) then
-				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-			end
-		end)
-		cell:SetScript("OnEnter", cellTooltip)
-		cell:SetScript("OnLeave", GameTooltip_Hide)
-		UI.cells[i] = cell
+		UI.cells[i] = makeCell(grid, i)
 	end
+	f.by = P.Label(left, "", "muted")
+	f.by:SetPoint("TOPLEFT", grid, "BOTTOMLEFT", 0, -10)
+	f.by:SetPoint("RIGHT")
+	f.by:SetWordWrap(true)
+	f.hint = P.Label(left, L.CARD_HINT, "muted")
+	f.hint:SetPoint("BOTTOMLEFT", 0, 0)
+	f.hint:SetPoint("RIGHT")
+	f.hint:SetWordWrap(true)
 
-	local side = CreateFrame("Frame", nil, f)
-	side:SetPoint("TOPLEFT", grid, "TOPRIGHT", 12, 0)
-	side:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 12)
-	f.side = side
-	local head = side:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	head:SetPoint("TOPLEFT")
-	head:SetText(L.GUILD)
-	f.head = head
-	UI.rows = {}
-	for i = 1, LIST_ROWS do
-		local row = side:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		row:SetPoint("TOPLEFT", 0, -6 - i * 16)
-		row:SetWidth(SIDE_W)
-		row:SetJustifyH("LEFT")
-		UI.rows[i] = row
-	end
-	f.note = side:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	f.note:SetPoint("TOPLEFT", 0, -16 - (LIST_ROWS + 1) * 16)
-	f.note:SetWidth(SIDE_W)
-	f.note:SetJustifyH("LEFT")
+	-- right page, "Cartón": the guild this week
+	local week = f:AddPage("carton")
+	local r = week.right
+	f.head = P.Label(r, L.GUILD, "heading")
+	f.head:SetPoint("TOPLEFT")
+	local rule = P.Rule(r)
+	rule:SetPoint("TOPLEFT", f.head, "BOTTOMLEFT", 0, -6)
+	rule:SetPoint("RIGHT")
+	f.guild = P.List(r, 24, guildRow)
+	f.guild.box:SetPoint("TOPLEFT", rule, "BOTTOMLEFT", 0, -6)
+	f.guild.box:SetPoint("RIGHT", -14, 0)
+	f.guild.box:SetHeight(300)
+	f.note = P.Label(r, "", "italic")
+	f.note:SetPoint("TOPLEFT", f.guild.box, "BOTTOMLEFT", 0, -10)
+	f.note:SetPoint("RIGHT")
 	f.note:SetWordWrap(true)
-
-	f.league = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.league:SetSize(SIDE_W, 22)
-	f.league:SetPoint("BOTTOM", 0, 28)
-	f.league:SetScript("OnClick", function()
-		UI.view = UI.view == "league" and "week" or "league"
-		UI.Refresh()
-	end)
-
-	-- officers write this week's goals and publish them
-	f.addGoal = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.addGoal:SetSize(SIDE_W, 22)
-	f.addGoal:SetPoint("BOTTOM", f.league, "TOP", 0, 56)
-	f.addGoal:SetText(L.ADD_GOAL)
-	f.addGoal:SetScript("OnClick", function()
-		StaticPopup_Show("BINGODELAGUILD_GOAL", L.GOAL_PROMPT)
-	end)
-	f.publish = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.publish:SetSize(SIDE_W, 22)
-	f.publish:SetPoint("TOP", f.addGoal, "BOTTOM", 0, -4)
-	f.publish:SetScript("OnClick", function()
-		ns.Publish()
-	end)
-	f.review = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.review:SetSize(SIDE_W, 22)
-	f.review:SetPoint("BOTTOM", f.addGoal, "TOP", 0, 4)
-	f.review:SetScript("OnClick", UI.ReviewNext)
-	f.exchange = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.exchange:SetSize(SIDE_W, 22)
-	f.exchange:SetPoint("BOTTOM", f.review, "TOP", 0, 4)
-	f.exchange:SetText(L.EXCHANGE)
-	f.exchange:SetScript("OnClick", function()
-		UI.ToggleExchange()
-	end)
-	-- anyone in the guild proposes a goal to the officers
-	f.suggest = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.suggest:SetSize(SIDE_W, 22)
-	f.suggest:SetPoint("BOTTOM", f.league, "TOP", 0, 4)
-	f.suggest:SetText(L.SUGGEST)
-	f.suggest:SetScript("OnClick", function()
-		StaticPopup_Show("BINGODELAGUILD_SUGGEST", L.SUGGEST_PROMPT)
-	end)
-
-	f.announce = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-	f.announce:SetSize(SIDE_W, 24)
-	f.announce:SetPoint("BOTTOM")
-	f.announce:SetText(L.ANNOUNCE)
-	f.announce:SetScript("OnClick", function()
+	f.announce = P.Button(r, L.ANNOUNCE, BTN_W, function(self)
 		-- only ever from this click: the addon never writes in chat by itself
 		C_ChatInfo.SendChatMessage(L.ANNOUNCE_TEXT:format(ns.CountMarks(ns.Marks())), "GUILD")
-		f.announce:Disable()
+		self:Disable()
 	end)
+	f.announce:SetPoint("BOTTOMLEFT")
+	-- anyone in the guild proposes a goal to the officers
+	f.suggest = P.Button(r, L.SUGGEST, BTN_W, function()
+		StaticPopup_Show("BINGODELAGUILD_SUGGEST", L.SUGGEST_PROMPT)
+	end)
+	f.suggest:SetPoint("BOTTOMRIGHT")
 
-	f:SetScript("OnShow", function()
-		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
-		UI.Refresh()
+	-- right page, "Liga": the last weeks added up
+	local league = f:AddPage("liga")
+	r = league.right
+	f.leagueHead = P.Label(r, L.LEAGUE_HEAD, "heading")
+	f.leagueHead:SetPoint("TOPLEFT")
+	rule = P.Rule(r)
+	rule:SetPoint("TOPLEFT", f.leagueHead, "BOTTOMLEFT", 0, -6)
+	rule:SetPoint("RIGHT")
+	f.leagueList = P.List(r, 24, guildRow)
+	f.leagueList.box:SetPoint("TOPLEFT", rule, "BOTTOMLEFT", 0, -6)
+	f.leagueList.box:SetPoint("RIGHT", -14, 0)
+	f.leagueList.box:SetHeight(340)
+	f.leagueNote = P.Label(r, L.LEAGUE_HINT, "muted")
+	f.leagueNote:SetPoint("TOPLEFT", f.leagueList.box, "BOTTOMLEFT", 0, -10)
+	f.leagueNote:SetPoint("RIGHT")
+	f.leagueNote:SetWordWrap(true)
+	f.league = f.tabs.liga -- the old button's name, for whoever looks for it
+
+	-- right page, "Oficiales": this week's goals, the suggestions and the exchange
+	local officers = f:AddPage("oficiales")
+	r = officers.right
+	f.officersHead = P.Label(r, L.OFFICERS_HEAD, "heading")
+	f.officersHead:SetPoint("TOPLEFT")
+	rule = P.Rule(r)
+	rule:SetPoint("TOPLEFT", f.officersHead, "BOTTOMLEFT", 0, -6)
+	rule:SetPoint("RIGHT")
+	f.officersHint = P.Label(r, L.OFFICERS_HINT, "muted")
+	f.officersHint:SetPoint("TOPLEFT", rule, "BOTTOMLEFT", 0, -6)
+	f.officersHint:SetPoint("RIGHT")
+	f.officersHint:SetWordWrap(true)
+	f.drafts = P.List(r, 22, draftRow, function(_, button)
+		if button == "RightButton" then
+			ns.ClearDrafts()
+		end
 	end)
-	f:SetScript("OnHide", function()
-		PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+	f.drafts.box:SetPoint("TOPLEFT", f.officersHint, "BOTTOMLEFT", 0, -8)
+	f.drafts.box:SetPoint("RIGHT", -14, 0)
+	f.drafts.box:SetHeight(210)
+	f.draftsNote = P.Label(r, "", "italic")
+	f.draftsNote:SetPoint("TOPLEFT", f.drafts.box, "BOTTOMLEFT", 0, -8)
+	f.draftsNote:SetPoint("RIGHT")
+	f.draftsNote:SetWordWrap(true)
+	f.addGoal = P.Button(r, L.ADD_GOAL, BTN_W, function()
+		StaticPopup_Show("BINGODELAGUILD_GOAL", L.GOAL_PROMPT)
 	end)
+	f.addGoal:SetPoint("BOTTOMLEFT", 0, 36)
+	f.publish = P.Button(r, "", BTN_W, function()
+		ns.Publish()
+	end)
+	f.publish:SetPoint("BOTTOMRIGHT", 0, 36)
+	f.review = P.Button(r, "", BTN_W, UI.ReviewNext)
+	f.review:SetPoint("BOTTOMLEFT")
+	f.exchange = P.Button(r, L.EXCHANGE, BTN_W, function()
+		UI.ToggleExchange()
+	end)
+	f.exchange:SetPoint("BOTTOMRIGHT")
+
+	f:HookScript("OnShow", UI.Refresh)
+	local p = ns.db and ns.db.settings.point
+	if p then
+		f:ClearAllPoints()
+		f:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+	end
+	UI.Relabel()
 	return f
 end
 
-local function paint(tex, c)
-	tex:SetColorTexture(c[1], c[2], c[3], c[4])
+-- Every fixed text of the window, so a language change can rewrite it.
+function UI.Relabel()
+	local f = UI.frame
+	if not f then
+		return
+	end
+	f:SetTitle(L.TITLE)
+	for key, tab in pairs(f.tabs) do
+		tab:SetText(L[tab.textKey] or key)
+	end
+	f.hint:SetText(L.CARD_HINT)
+	f.head:SetText(L.GUILD)
+	f.announce:SetText(L.ANNOUNCE)
+	f.suggest:SetText(L.SUGGEST)
+	f.leagueHead:SetText(L.LEAGUE_HEAD)
+	f.leagueNote:SetText(L.LEAGUE_HINT)
+	f.officersHead:SetText(L.OFFICERS_HEAD)
+	f.officersHint:SetText(L.OFFICERS_HINT)
+	f.addGoal:SetText(L.ADD_GOAL)
+	f.exchange:SetText(L.EXCHANGE)
+	if UI.exchange then
+		UI.exchange:SetTitle(L.EXCHANGE)
+		UI.exchange.hint:SetText(L.EXCHANGE_HINT)
+		UI.exchange.importButton:SetText(L.IMPORT)
+	end
 end
 
 function UI.Refresh()
@@ -302,7 +443,8 @@ function UI.Refresh()
 	end
 	local _, resetAt = ns.Week()
 	local officer = ns.OfficerCard()
-	f.week:SetText(L.WEEK_UNTIL:format(date("%d/%m %H:%M", resetAt)) .. (officer and ("  ·  " .. L.CARD_BY:format(officer.by)) or ""))
+	f.week:SetText(L.WEEK_UNTIL:format(date("%d/%m %H:%M", resetAt)))
+	f.by:SetText(officer and L.CARD_BY:format(officer.by) or "")
 	local card = ns.Card()
 	local marks = ns.Marks(card)
 	local lines, inLine = ns.Lines(marks)
@@ -321,7 +463,7 @@ function UI.Refresh()
 		if id == "free" then
 			cell.text:SetText(L.FREE)
 			cell.progress:SetText("")
-			paint(cell.bg, inLine[i] and COLORS.line or COLORS.free)
+			stamp(cell, inLine[i] and "line" or "free")
 		else
 			local g = ns.Goal(id)
 			cell.text:SetText(ns.GoalText(g))
@@ -330,41 +472,51 @@ function UI.Refresh()
 			else
 				cell.progress:SetText("")
 			end
-			paint(cell.bg, inLine[i] and COLORS.line or done and COLORS.done or COLORS.todo)
+			stamp(cell, inLine[i] and "line" or done and "done" or "todo")
 		end
 	end
 
-	-- the guild: this week's cards (same card as yours), or the league of the last weeks
+	-- the guild: this week's cards (same card as yours)
 	local list = {}
-	if UI.view == "league" then
-		f.head:SetText(L.LEAGUE_HEAD)
-		for _, e in ipairs(ns.League()) do
-			list[#list + 1] = { name = e.name, text = e.name .. "  " .. L.POINTS:format(e.points) }
-		end
-	else
-		f.head:SetText(L.GUILD)
-		for sender, c in pairs(ns.SameCard()) do
-			list[#list + 1] = { name = sender, lines = ns.Lines(c.m), marks = ns.CountMarks(c.m) }
-		end
-		table.sort(list, function(a, b)
-			if a.lines ~= b.lines then
-				return a.lines > b.lines
-			end
-			if a.marks ~= b.marks then
-				return a.marks > b.marks
-			end
-			return a.name < b.name
-		end)
-		for _, e in ipairs(list) do
-			e.text = e.name .. "  " .. e.marks .. (e.lines > 0 and ("  |cffffd100" .. L.BINGO .. "|r") or "")
-		end
+	for sender, c in pairs(ns.SameCard()) do
+		list[#list + 1] = { name = sender, lines = ns.Lines(c.m), marks = ns.CountMarks(c.m) }
 	end
-	for i, row in ipairs(UI.rows) do
-		row:SetText(list[i] and list[i].text or "")
+	table.sort(list, function(a, b)
+		if a.lines ~= b.lines then
+			return a.lines > b.lines
+		end
+		if a.marks ~= b.marks then
+			return a.marks > b.marks
+		end
+		return a.name < b.name
+	end)
+	for _, e in ipairs(list) do
+		e.right = L.MARKED:format(e.marks)
 	end
-	f.league:SetText(UI.view == "league" and L.WEEK_VIEW or L.LEAGUE)
+	f.guild:SetData(list, true)
+	UI.rows = list
+
+	-- the league of the last weeks
+	local table_ = {}
+	for _, e in ipairs(ns.League()) do
+		table_[#table_ + 1] = { name = e.name, right = L.POINTS:format(e.points) }
+	end
+	f.leagueList:SetData(table_, true)
+
 	local officerNow = ns.IAmOfficer()
 	local _, inGuild = ns.Scope()
+	-- the officers' bookmark exists only for officers (it is the last one, so hiding it leaves no gap)
+	f.tabs.oficiales:SetShown(officerNow)
+	if not officerNow and f.selected == "oficiales" then
+		f:SelectTab("carton")
+		return
+	end
+	local drafts = {}
+	for i, text in ipairs(ns.Drafts()) do
+		drafts[i] = { text = i .. ". " .. text }
+	end
+	f.drafts:SetData(drafts, true)
+	f.draftsNote:SetText(#drafts == 0 and L.NO_DRAFTS or L.DRAFTS_RIGHT_CLICK)
 	f.addGoal:SetShown(officerNow)
 	f.publish:SetShown(officerNow)
 	f.publish:SetText(L.PUBLISH:format(#ns.Drafts()))
@@ -375,11 +527,11 @@ function UI.Refresh()
 	f.exchange:SetShown(officerNow)
 	f.suggest:SetShown(inGuild and not officerNow and not ns.IsTrial())
 	if not inGuild then
-		f.note:SetText(L.NO_GUILD)
+		f.note:SetText(L.NO_GUILD .. "\n\n" .. L.NO_GUILD_HINT)
 	elseif ns.IsTrial() then
 		f.note:SetText(L.TRIAL)
 	elseif #list == 0 then
-		f.note:SetText(L.NOBODY)
+		f.note:SetText(L.NOBODY .. "\n\n" .. L.NOBODY_HINT)
 	else
 		f.note:SetText("")
 	end
@@ -387,46 +539,30 @@ function UI.Refresh()
 	f.announce:SetEnabled(true)
 end
 
--- Export / import of the goal list: a small window with the text, "Copiar" is just selecting it.
+-- Export / import of the goal list: a parchment card with the text; "copy" is just selecting it.
 local function buildExchange()
-	local f = CreateFrame("Frame", ADDON .. "ExchangeFrame", UIParent, "BasicFrameTemplateWithInset")
-	f:SetSize(360, 300)
-	f:SetPoint("CENTER")
-	f:SetFrameStrata("DIALOG")
-	f:SetMovable(true)
-	f:EnableMouse(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	f:Hide()
-	f.TitleText:SetText(L.EXCHANGE)
-	tinsert(UISpecialFrames, ADDON .. "ExchangeFrame")
-	local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	hint:SetPoint("TOPLEFT", 12, -30)
-	hint:SetPoint("TOPRIGHT", -12, -30)
-	hint:SetJustifyH("LEFT")
-	hint:SetWordWrap(true)
-	hint:SetText(L.EXCHANGE_HINT)
-	local body = CreateFrame("Frame", nil, f, "ScrollingEditBoxTemplate")
-	body:SetPoint("TOPLEFT", 12, -62)
-	body:SetPoint("BOTTOMRIGHT", -30, 40)
-	local bar = CreateFrame("EventFrame", nil, f, "MinimalScrollBar")
-	bar:SetPoint("TOPLEFT", body, "TOPRIGHT", 4, 0)
-	bar:SetPoint("BOTTOMLEFT", body, "BOTTOMRIGHT", 4, 0)
-	ScrollUtil.RegisterScrollBoxWithScrollBar(body:GetScrollBox(), bar)
-	f.body = body
-	local import = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	import:SetSize(120, 22)
-	import:SetPoint("BOTTOMRIGHT", -12, 10)
-	import:SetText(L.IMPORT)
-	import:SetScript("OnClick", function()
-		local n = ns.ImportGoals(body:GetEditBox():GetText())
+	local f = P.Card(ADDON .. "ExchangeFrame", 420, 340, L.EXCHANGE)
+	f.hint = P.Label(f.body, L.EXCHANGE_HINT, "muted")
+	f.hint:SetPoint("TOPLEFT")
+	f.hint:SetPoint("RIGHT")
+	f.hint:SetWordWrap(true)
+	local area = P.TextArea(f.body)
+	area:SetPoint("TOPLEFT", f.hint, "BOTTOMLEFT", 0, -8)
+	area:SetPoint("BOTTOMRIGHT", 0, 34)
+	f.area = area
+	f.body = area.box -- the ScrollingEditBox, as before
+	local import = P.Button(f, L.IMPORT, 120, function()
+		local n = ns.ImportGoals(f.body:GetEditBox():GetText())
 		ns.Print(n and L.IMPORTED:format(n) or L.NOT_AN_EXPORT)
 		if n then
 			f:Hide()
 		end
 	end)
+	import:SetPoint("BOTTOMRIGHT", -20, 20)
 	f.importButton = import
+	function f:SetTitle(text)
+		self.title:SetText(text)
+	end
 	UI.exchange = f
 	return f
 end
@@ -445,15 +581,25 @@ end
 
 function UI.Toggle()
 	local f = UI.frame or build()
-	f:SetShown(not f:IsShown())
+	if f:IsShown() then
+		f:Hide()
+		return
+	end
+	f:Show()
+	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or "carton")
 end
 
 function UI.Show()
 	local f = UI.frame or build()
 	f:Show()
+	f:SelectTab(UI.view == "league" and "liga" or UI.view == "officers" and "oficiales" or "carton")
 	UI.Refresh()
 end
 
 ns.On("card", UI.Refresh)
 ns.On("guild", UI.Refresh)
 ns.On("suggest", UI.Refresh)
+ns.On("language", function()
+	UI.Relabel()
+	UI.Refresh()
+end)

@@ -199,6 +199,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
 	if event == "ADDON_LOADED" then
 		if ... == ADDON then
 			ns.InitDB()
+			ns.SetLanguage(ns.db.settings.lang)
 			frame:UnregisterEvent("ADDON_LOADED")
 		end
 	elseif event == "PLAYER_LOGIN" then
@@ -268,6 +269,15 @@ SlashCmdList.BINGODELAGUILD = function(msg)
 	elseif msg == "publicar" or msg == "publish" then
 		if not ns.Publish() then
 			ns.Print(ns.IAmOfficer() and L.DRAFTS:format(0, "") or L.NOT_OFFICER)
+		end
+	elseif msg:match("^idioma") or msg:match("^language") then
+		local lang = msg:match("^%S+%s+(%S+)")
+		if lang == "es" or lang == "en" or lang == "auto" then
+			ns.db.settings.lang = lang
+			ns.SetLanguage(lang)
+			ns.Print(L.LANG_SET:format(lang))
+		else
+			ns.Print(L.LANG_HELP)
 		end
 	elseif msg == "help" or msg == "ayuda" then
 		ns.Print(L.HELP)

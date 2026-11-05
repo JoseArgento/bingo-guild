@@ -12,6 +12,7 @@
 ## AddonCompartmentFuncOnLeave: BingoDeLaGuild_OnAddonCompartmentLeave
 ## Category: Roleplay
 
+Libs\Pergamino\Pergamino.lua
 Locales.lua
 Goals.lua
 Core.lua

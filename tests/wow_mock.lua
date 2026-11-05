@@ -1,6 +1,5 @@
--- A small stand-in for the WoW client, enough to load Bingo de la Guild and drive its events in Lua 5.1.
--- It does not draw anything: widget methods that only affect the screen are accepted and recorded.
--- That every global and method Bingo de la Guild calls exists in Forever is checked separately (tools/check_api.py).
+-- A small stand-in for the WoW client, enough to load Bingo de la Guild (and the Pergamino skin) in Lua 5.1.
+-- That every global and method the addon calls exists in Forever is checked separately (tools/check_api.py).
 
 MOCK = {
 	events = {},       -- event -> list of frames
@@ -111,11 +110,77 @@ local function newObject(kind, name, parent, template)
 		rawset(parent, "Tabs", rawget(parent, "Tabs") or {})
 		table.insert(rawget(parent, "Tabs"), o)
 	end
-	if template == "UIPanelButtonTemplate" then
+	if template == "UIPanelButtonTemplate" or kind == "Button" or kind == "CheckButton" then
 		o.fontString = newObject("FontString", nil, o)
 	end
 	return o
 end
+
+function CreateFont(name)
+	local f = newObject("Font", name)
+	f._font = {}
+	return f
+end
+function Frame:SetFont(path, size, flags)
+	self._font = { path, size, flags }
+end
+function Frame:GetFont()
+	return unpack(self._font or {})
+end
+function Frame:SetFontObject(font)
+	self._fontObject = font
+end
+function Frame:GetFontObject()
+	return self._fontObject
+end
+function Frame:SetNormalFontObject(font)
+	self._normalFont = font
+end
+function Frame:GetNormalFontObject()
+	return self._normalFont
+end
+function Frame:GetObjectType()
+	return self._kind
+end
+function Frame:ClearAllPoints()
+	self._points = {}
+end
+function Frame:SetPoint(...)
+	self._points = self._points or {}
+	table.insert(self._points, { ... })
+end
+function Frame:GetNumPoints()
+	return #(self._points or {})
+end
+function Frame:SetTexCoord(...)
+	self._texCoord = { ... }
+end
+function Frame:GetTexCoord()
+	return unpack(self._texCoord or { 0, 1, 0, 1 })
+end
+function Frame:SetVertexColor(r, g, b, a)
+	self._vertex = { r, g, b, a or 1 }
+end
+function Frame:SetAlpha(a)
+	self._alpha = a
+end
+function Frame:GetAlpha()
+	return self._alpha or 1
+end
+function Frame:SetNormalTexture(t)
+	self._normalTexture = t
+end
+function Frame:SetCheckedTexture(t)
+	self._checkedTexture = t
+end
+function Frame:SetEnabled(v)
+	self._enabled = v and true or false
+end
+function Frame:IsEnabled()
+	return self._enabled ~= false
+end
+function Frame:GetRegions() end
+function Frame:GetChildren() end
 MOCK.newObject = newObject
 
 function Frame:SetScript(event, fn)
@@ -181,6 +246,9 @@ function Frame:IsVisible()
 end
 function Frame:SetText(t)
 	self._text = t or ""
+	if self.fontString then
+		self.fontString._text = self._text
+	end
 	if self.editBox then
 		self.editBox._text = self._text
 	end
@@ -228,6 +296,18 @@ function Frame:GetWidth()
 end
 function Frame:SetWidth(w)
 	self.width = w
+end
+function Frame:SetHeight(h)
+	self.height = h
+end
+function Frame:GetHeight()
+	return self.height or 100
+end
+function Frame:SetSize(w, h)
+	self.width, self.height = w, h
+end
+function Frame:GetSize()
+	return self.width or 100, self.height or 100
 end
 function Frame:GetStringWidth()
 	return #(self._text or "") * 6
@@ -334,7 +414,8 @@ end
 UISpecialFrames = {}
 StaticPopupDialogs = {}
 SlashCmdList = {}
-ACCEPT, CANCEL, YES, NO = "Accept", "Cancel", "Yes", "No"
+ACCEPT, CANCEL, YES, NO, OKAY = "Accept", "Cancel", "Yes", "No", "Okay"
+RAID_CLASS_COLORS = { MAGE = { colorStr = "ff3fc7eb" }, PRIEST = { colorStr = "ffffffff" }, WARRIOR = { colorStr = "ffc69b6d" } }
 SOUNDKIT = { RAID_WARNING = 8959, IG_CHARACTER_INFO_TAB = 841, IG_CHARACTER_INFO_OPEN = 839, IG_CHARACTER_INFO_CLOSE = 840 }
 ChatTypeInfo = { RAID_WARNING = { r = 1, g = 0.28, b = 0 } }
 function PlaySound(id)
@@ -443,6 +524,7 @@ end
 function GetRealmName()
 	return MOCK.player.realm
 end
+MOCK.groupRealm = {} -- unit -> realm of a group member from another realm
 function UnitName(unit)
 	if unit == "player" then
 		return MOCK.player.name
@@ -450,7 +532,7 @@ function UnitName(unit)
 	if unit == "target" then
 		return MOCK.target and MOCK.target.name
 	end
-	return MOCK.group[unit]
+	return MOCK.group[unit], MOCK.groupRealm[unit]
 end
 function UnitIsUnit(a, b)
 	return a == b or (b == "player" and MOCK.group[a] == MOCK.player.name)
@@ -469,7 +551,11 @@ end
 function UnitLevel()
 	return MOCK.player.level
 end
-function UnitClass()
+MOCK.groupClass = {} -- unit -> class token of a group member
+function UnitClass(unit)
+	if unit and unit ~= "player" and MOCK.groupClass[unit] then
+		return MOCK.groupClass[unit], MOCK.groupClass[unit]
+	end
 	return "Mage", MOCK.player.class
 end
 function UnitRace()

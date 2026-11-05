@@ -4,6 +4,22 @@ local _, ns = ...
 local L = {
 	BINDING_TOGGLE = "Open / close",
 	TITLE = "Guild Bingo",
+	TAB_CARTON = "Card",
+	TAB_LIGA = "League",
+	TAB_OFICIALES = "Officers",
+	TAB_CARTON_TIP = "This week's card and how your guild is doing.",
+	TAB_LIGA_TIP = "Points of the last weeks: one per square, five more per line.",
+	TAB_OFICIALES_TIP = "Write this week's goals, review the guild's suggestions, export or import the list.",
+	CARD_HINT = "Click a square when it happens; the ones that mark themselves say so in their tooltip. A row, a column or a diagonal is a BINGO.",
+	NO_GUILD_HINT = "You can still play: the squares are yours to mark. Join a guild and the card becomes everyone's.",
+	NOBODY_HINT = "Whoever installs it gets the same card and sees yours.",
+	LEAGUE_HINT = "Only guildmates with the addon count; weeks older than five weeks are forgotten.",
+	OFFICERS_HEAD = "Officers' card",
+	OFFICERS_HINT = "Write up to 24 goals for the week and publish: the whole guild gets them, filled up with goals from the list.",
+	NO_DRAFTS = "No goals written yet. The guild plays the list's card.",
+	DRAFTS_RIGHT_CLICK = "Right-click a goal to clear the list.",
+	LANG_SET = "Language: %s. Reload the interface for the chat texts to follow (/reload).",
+	LANG_HELP = "/bingo idioma es | en | auto",
 	WEEK_UNTIL = "Card for the week, until %s",
 	MARKED = "%d of 25",
 	BINGO = "BINGO!",
@@ -25,10 +41,9 @@ local L = {
 	OTHER_VERSION = "%s has another version of the addon: their card is different.",
 	RESYNC = "Asked the guild for their cards.",
 	CANT_SEND = "Could not send your card right now; it will try again.",
-	HELP = "/bingo opens the card. /bingo sync asks the guild for their cards again. /bingo liga shows the league. /bingo sugerir <text> proposes a goal to the officers. Officers: /bingo meta <text>, /bingo metas, /bingo borrar, /bingo publicar, /bingo sugerencias, /bingo exportar.",
+	HELP = "/bingo opens the card. /bingo sync asks the guild for their cards again. /bingo liga shows the league. /bingo sugerir <text> proposes a goal to the officers. Officers: /bingo meta <text>, /bingo metas, /bingo borrar, /bingo publicar, /bingo sugerencias, /bingo exportar. /bingo idioma es|en|auto picks the language.",
 	COMPARTMENT = "Click to open your card.",
 	LEAGUE = "League",
-	WEEK_VIEW = "This week",
 	LEAGUE_HEAD = "League (last weeks)",
 	POINTS = "%d pts",
 	ADD_GOAL = "Add a goal",
@@ -55,6 +70,22 @@ local L = {
 local es = {
 	BINDING_TOGGLE = "Abrir / cerrar",
 	TITLE = "Bingo de la Guild",
+	TAB_CARTON = "Cartón",
+	TAB_LIGA = "Liga",
+	TAB_OFICIALES = "Oficiales",
+	TAB_CARTON_TIP = "El cartón de esta semana y cómo viene tu guild.",
+	TAB_LIGA_TIP = "Puntos de las últimas semanas: uno por casilla, cinco más por línea.",
+	TAB_OFICIALES_TIP = "Escribir las metas de la semana, revisar las sugerencias de la guild, exportar o importar la lista.",
+	CARD_HINT = "Hacé clic en una casilla cuando pase; las que se marcan solas lo dicen en su tooltip. Una fila, una columna o una diagonal es BINGO.",
+	NO_GUILD_HINT = "Igual podés jugar: las casillas son tuyas. Cuando entres a una guild, el cartón pasa a ser el de todos.",
+	NOBODY_HINT = "El que lo instale recibe el mismo cartón y ve el tuyo.",
+	LEAGUE_HINT = "Cuentan solo los de la guild con el addon; las semanas de hace más de cinco se olvidan.",
+	OFFICERS_HEAD = "Cartón de los oficiales",
+	OFFICERS_HINT = "Escribí hasta 24 metas para la semana y publicá: toda la guild las recibe, completadas con metas de la lista.",
+	NO_DRAFTS = "Todavía no hay metas escritas. La guild juega el cartón de la lista.",
+	DRAFTS_RIGHT_CLICK = "Clic derecho en una meta para vaciar la lista.",
+	LANG_SET = "Idioma: %s. Recargá la interfaz para que los textos del chat lo sigan (/reload).",
+	LANG_HELP = "/bingo idioma es | en | auto",
 	WEEK_UNTIL = "Cartón de la semana, hasta el %s",
 	MARKED = "%d de 25",
 	BINGO = "¡BINGO!",
@@ -79,7 +110,6 @@ local es = {
 	HELP = "/bingo abre el cartón. /bingo sync le vuelve a pedir los cartones a la guild. /bingo liga muestra la liga. /bingo sugerir <texto> le propone una meta a los oficiales. Oficiales: /bingo meta <texto>, /bingo metas, /bingo borrar, /bingo publicar, /bingo sugerencias, /bingo exportar.",
 	COMPARTMENT = "Clic para abrir tu cartón.",
 	LEAGUE = "Liga",
-	WEEK_VIEW = "Esta semana",
 	LEAGUE_HEAD = "Liga (últimas semanas)",
 	POINTS = "%d pts",
 	ADD_GOAL = "Agregar meta",
@@ -103,11 +133,31 @@ local es = {
 	NOT_AN_EXPORT = "Eso no es una lista exportada (empieza con BINGO1:).",
 }
 
-local locale = GetLocale()
-ns.spanish = locale == "esES" or locale == "esMX"
-if ns.spanish then
-	for k, v in pairs(es) do
-		L[k] = v
-	end
+-- L is one table for the whole addon: SetLanguage rewrites it in place (every file keeps its local L), so the
+-- language can follow the client (auto) or what the player chose in the settings, even on an English client.
+local en = {}
+for k, v in pairs(L) do
+	en[k] = v
 end
 ns.L = L
+
+function ns.SetLanguage(lang)
+	if lang ~= "es" and lang ~= "en" then
+		lang = "auto"
+	end
+	local locale = GetLocale()
+	ns.lang = lang
+	ns.spanish = lang == "es" or (lang == "auto" and (locale == "esES" or locale == "esMX"))
+	for k, v in pairs(en) do
+		L[k] = v
+	end
+	if ns.spanish then
+		for k, v in pairs(es) do
+			L[k] = v
+		end
+	end
+	if ns.Fire then
+		ns.Fire("language")
+	end
+end
+ns.SetLanguage("auto")
