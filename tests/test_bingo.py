@@ -945,7 +945,7 @@ def test_the_exchange_window(me):
 def test_the_window_is_a_pergamino_book(me):
     me.run("ns.UI.Toggle()")
     f = me.ns.UI.frame
-    assert me.run("return Pergamino.VERSION") == 3
+    assert me.run("return Pergamino.VERSION") == 4
     assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
     assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
     assert f.title.GetText(f.title) == "Guild Bingo"
