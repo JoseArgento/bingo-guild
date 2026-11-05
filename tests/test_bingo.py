@@ -945,7 +945,7 @@ def test_the_exchange_window(me):
 def test_the_window_is_a_pergamino_book(me):
     me.run("ns.UI.Toggle()")
     f = me.ns.UI.frame
-    assert me.run("return Pergamino.VERSION") == 2
+    assert me.run("return Pergamino.VERSION") == 3
     assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
     assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
     assert f.title.GetText(f.title) == "Guild Bingo"
@@ -966,7 +966,7 @@ def test_bookmarks_turn_the_page_and_have_tooltips(me):
     tab._scripts.OnClick(tab)
     assert f.selected == "liga" and me.ns.UI.view == "league"
     assert f.pages.liga.right.IsShown(f.pages.liga.right) and not f.pages.carton.right.IsShown(f.pages.carton.right)
-    assert f.tabs.liga.width == 198 and f.tabs.carton.width == 184  # the open bookmark sticks out more
+    assert f.tabs.liga.width == 164 and f.tabs.carton.width == 150  # the open bookmark sticks out more
     tab._scripts.OnEnter(tab)
     lines = me.run("return table.concat(GameTooltip.lines or {}, '\\n')")
     assert "one per square" in lines
