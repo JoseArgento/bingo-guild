@@ -4,6 +4,8 @@ Un cartón de bingo por semana para jugar con tu guild en **WoW Forever**. Son 2
 
 [Read in English](README.en.md)
 
+![El cartón de la semana en el juego](docs/libro.png)
+
 **Contenido**
 
 - [Cómo se juega](#cómo-se-juega)
@@ -49,15 +51,17 @@ Copiá la carpeta `BingoDeLaGuild` (con su `Libs\Pergamino` adentro) a `Interfac
 **Probado:**
 - ✅ **Cada función, evento y template existe en Forever 1.60.1**, revisado con `tools/check_api.py` contra los dumps de [Ketho/BlizzardInterfaceResources](https://github.com/Ketho/BlizzardInterfaceResources) y el código de la UI de [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source), rama `forever`. Por ejemplo: en Forever no existe `SendChatMessage` suelto, es `C_ChatInfo.SendChatMessage`; `CHAT_MSG_ADDON` no trae valores secretos; `C_ChatInfo.InChatMessagingLockdown` existe.
 - ✅ [forever-lint](https://github.com/JoseArgento/forever-lint): solo notas que el addon ya maneja: FL012 (cuentas de prueba) y FL013 (`PLAYER_DEAD` doble y la zona vieja al viajar). [Addon Sentry](https://github.com/JoseArgento/addon-sentry): "Sin señales de riesgo".
-- ✅ **98 tests** en Lua 5.1 (el Lua de WoW) con un reemplazo chico del cliente. Corren **dos o más clientes a la vez** y se pasan los mensajes, así que la sincronización se prueba de punta a punta: cartón igual para toda la guild, cartón nuevo cada semana, cada meta automática, bingo por filas, columnas y diagonales, un recién llegado que pide los cartones, muchas preguntas con una sola respuesta, el cartón de un oficial (que solo valga si el roster dice que es oficial, que no se use a medias, que uno viejo no pise uno nuevo, que el que llega tarde lo reciba), la liga, las sugerencias (solo las guardan los oficiales, tope, repetidas, inundación, agregar o descartar), exportar e importar la lista, las metas de Forever (punto del Legado, Skyborne a 10, mazmorras nuevas por nombre), mensajes malos o con código adentro, inundación de mensajes, tope de 1000, cuenta de prueba, sin guild, reintento cuando el juego frena los mensajes, guardar y cargar, y el libro (texturas y fuentes propias, marcadores que pasan de página, sellos de las casillas, pestaña de oficiales solo para oficiales, idioma elegible, estados vacíos, la nota sin guild arriba, singulares, botón del minimapa).
+- ✅ **101 tests** en Lua 5.1 (el Lua de WoW) con un reemplazo chico del cliente. Corren **dos o más clientes a la vez** y se pasan los mensajes, así que la sincronización se prueba de punta a punta: cartón igual para toda la guild, cartón nuevo cada semana, cada meta automática, bingo por filas, columnas y diagonales, un recién llegado que pide los cartones, muchas preguntas con una sola respuesta, el cartón de un oficial (que solo valga si el roster dice que es oficial, que no se use a medias, que uno viejo no pise uno nuevo, que el que llega tarde lo reciba), la liga, las sugerencias (solo las guardan los oficiales, tope, repetidas, inundación, agregar o descartar), exportar e importar la lista, las metas de Forever (punto del Legado, Skyborne a 10, mazmorras nuevas por nombre), mensajes malos o con código adentro, inundación de mensajes, tope de 1000, cuenta de prueba, sin guild, reintento cuando el juego frena los mensajes, guardar y cargar, y el libro (texturas y fuentes propias, marcadores que pasan de página, sellos de las casillas, pestaña de oficiales solo para oficiales, idioma elegible, estados vacíos, la nota sin guild arriba, singulares, botón del minimapa).
 
-**Sin probar ⏳** (no tengo el cliente de Forever):
+**En el cliente** (desde el lanzamiento): el libro, el cartón, las casillas que se marcan solas por nivel y zona, la liga y el botón del minimapa, con un solo jugador.
+
+**Todavía sin ver ⏳:**
+- Una guild entera con el addon a la vez (los cartones de los demás, el cartón de oficiales y las sugerencias se probaron con varios clientes simulados).
 - Las mazmorras nuevas se marcan solas por el nombre que da `GetInstanceInfo()`, en inglés: en un cliente en castellano los nombres pueden venir traducidos y esas casillas se marcan a mano.
 - Que `UnitRace("player")` diga "Skyborne" (el nombre o el token de raza) en el cliente.
-- Cómo se ve el libro de verdad: las texturas TGA, las fuentes TTF que carga `SetFont`, los marcadores sobre el borde de la tapa.
 - Que `C_DateAndTime.GetSecondsUntilWeeklyReset` dé el reinicio de Forever. Si no da nada, el addon usa semanas de lunes a lunes (UTC).
-- Que los eventos de las metas automáticas salten como en el resto de los clientes (`ENCOUNTER_END` en las mazmorras de Forever, `PLAYER_CONTROL_LOST` al tomar un vuelo).
-- Que `GetGuildRosterInfo` devuelva el índice de rango en tercer lugar, como en el resto de los clientes (la UI de Forever no lo usa, así que no lo pude ver en su código).
+- Que `ENCOUNTER_END` salte en las mazmorras de Forever y `PLAYER_CONTROL_LOST` al tomar un vuelo.
+- Que `GetGuildRosterInfo` devuelva el índice de rango en tercer lugar, como en el resto de los clientes.
 - Que el botón de anunciar pueda escribir en la guild (`C_ChatInfo.SendChatMessage` tiene restricciones; se llama solo desde el clic).
 
 ## Desarrollo
