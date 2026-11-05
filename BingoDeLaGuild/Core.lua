@@ -62,7 +62,8 @@ function ns.InitDB()
 end
 
 function ns.Me()
-	return UnitName("player")
+	-- one value: UnitName also returns the realm
+	return (UnitName("player"))
 end
 
 function ns.CharKey()
