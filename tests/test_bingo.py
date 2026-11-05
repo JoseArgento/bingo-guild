@@ -468,6 +468,25 @@ def test_no_guild_no_messages():
     assert c.sent() == []
     c.run("ns.UI.Toggle()")
     assert "not in a guild" in c.run("return ns.UI.frame.note:GetText()")
+    # with nobody to list, the note sits right under the heading and the empty list stays hidden
+    assert c.run("return ns.UI.frame.note._points[1][2] == ns.UI.frame.guildRule")
+    assert not c.run("return ns.UI.frame.guild.box:IsShown()")
+
+
+def test_with_guildmates_the_list_shows_and_the_note_moves_under_it():
+    me = Client().login()
+    me.receive(card_message(me, "1" * 25))
+    me.run("ns.UI.Toggle()")
+    assert me.run("return ns.UI.frame.guild.box:IsShown()")
+    assert me.run("return ns.UI.frame.note._points[1][2] == ns.UI.frame.guild.box")
+
+
+def test_one_point_is_singular():
+    me = Client().login()
+    me.receive(card_message(me, "0" * 12 + "1" + "0" * 12))  # Ana: only the free square
+    me.run("ns.UI.Toggle(); ns.UI.frame:SelectTab('liga')")
+    rows = me.run("local t = {} for _, r in ipairs(ns.UI.frame.leagueList.box.data or {}) do t[#t+1] = r.right end return table.concat(t, '|')")
+    assert "1 pt" in rows and "1 pts" not in rows
 
 
 def test_a_throttled_send_is_tried_again(me):

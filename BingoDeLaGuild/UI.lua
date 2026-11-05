@@ -273,6 +273,8 @@ end
 local function build()
 	local FRAME = ADDON .. "Frame"
 	local f = P.Book(FRAME, { title = L.TITLE, width = 860, height = 540 })
+	-- clicking the book brings the whole of it over any other book that is open (their seals showed through)
+	f:SetToplevel(true)
 	UI.frame = f
 	f.TitleText = f.title -- as the old frame had it
 	for _, key in ipairs({ "carton", "liga", "oficiales" }) do
@@ -322,10 +324,12 @@ local function build()
 	local rule = P.Rule(r)
 	rule:SetPoint("TOPLEFT", f.head, "BOTTOMLEFT", 0, -6)
 	rule:SetPoint("RIGHT")
+	f.guildRule = rule
 	f.guild = P.List(r, 24, guildRow)
 	f.guild.box:SetPoint("TOPLEFT", rule, "BOTTOMLEFT", 0, -6)
 	f.guild.box:SetPoint("RIGHT", -14, 0)
 	f.guild.box:SetHeight(300)
+	-- the note (no guild, nobody yet) reads under the heading when the list is empty, under the list otherwise
 	f.note = P.Label(r, "", "italic")
 	f.note:SetPoint("TOPLEFT", f.guild.box, "BOTTOMLEFT", 0, -10)
 	f.note:SetPoint("RIGHT")
@@ -499,7 +503,7 @@ function UI.Refresh()
 	-- the league of the last weeks
 	local table_ = {}
 	for _, e in ipairs(ns.League()) do
-		table_[#table_ + 1] = { name = e.name, right = L.POINTS:format(e.points) }
+		table_[#table_ + 1] = { name = e.name, right = e.points == 1 and L.POINTS_1 or L.POINTS:format(e.points) }
 	end
 	f.leagueList:SetData(table_, true)
 
@@ -535,6 +539,16 @@ function UI.Refresh()
 	else
 		f.note:SetText("")
 	end
+	-- an empty list makes no page: the note takes its place right under the heading
+	local empty = #list == 0
+	f.guild.box:SetShown(not empty)
+	f.note:ClearAllPoints()
+	if empty then
+		f.note:SetPoint("TOPLEFT", f.guildRule, "BOTTOMLEFT", 0, -12)
+	else
+		f.note:SetPoint("TOPLEFT", f.guild.box, "BOTTOMLEFT", 0, -10)
+	end
+	f.note:SetPoint("RIGHT")
 	f.announce:SetShown(inGuild and lines > 0)
 	f.announce:SetEnabled(true)
 end
@@ -553,7 +567,7 @@ local function buildExchange()
 	f.body = area.box -- the ScrollingEditBox, as before
 	local import = P.Button(f, L.IMPORT, 120, function()
 		local n = ns.ImportGoals(f.body:GetEditBox():GetText())
-		ns.Print(n and L.IMPORTED:format(n) or L.NOT_AN_EXPORT)
+		ns.Print(n and (n == 1 and L.IMPORTED_1 or L.IMPORTED:format(n)) or L.NOT_AN_EXPORT)
 		if n then
 			f:Hide()
 		end

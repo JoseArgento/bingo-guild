@@ -46,6 +46,7 @@ local L = {
 	LEAGUE = "League",
 	LEAGUE_HEAD = "League (last weeks)",
 	POINTS = "%d pts",
+	POINTS_1 = "1 pt",
 	ADD_GOAL = "Add a goal",
 	GOAL_PROMPT = "A goal for this week's guild card (up to 50 letters):",
 	PUBLISH = "Publish card (%d)",
@@ -64,6 +65,7 @@ local L = {
 	EXCHANGE_HINT = "Copy this text to keep the goal list, or paste one and press Import: it replaces the goals, up to 24.",
 	IMPORT = "Import",
 	IMPORTED = "%d goals imported.",
+	IMPORTED_1 = "1 goal imported.",
 	NOT_AN_EXPORT = "That is not an exported goal list (it starts with BINGO1:).",
 }
 
@@ -112,6 +114,7 @@ local es = {
 	LEAGUE = "Liga",
 	LEAGUE_HEAD = "Liga (últimas semanas)",
 	POINTS = "%d pts",
+	POINTS_1 = "1 pt",
 	ADD_GOAL = "Agregar meta",
 	GOAL_PROMPT = "Una meta para el cartón de la guild de esta semana (hasta 50 letras):",
 	PUBLISH = "Publicar cartón (%d)",
@@ -130,6 +133,7 @@ local es = {
 	EXCHANGE_HINT = "Copiá este texto para guardar la lista de metas, o pegá una y apretá Importar: reemplaza las metas, hasta 24.",
 	IMPORT = "Importar",
 	IMPORTED = "%d metas importadas.",
+	IMPORTED_1 = "1 meta importada.",
 	NOT_AN_EXPORT = "Eso no es una lista exportada (empieza con BINGO1:).",
 }
 
