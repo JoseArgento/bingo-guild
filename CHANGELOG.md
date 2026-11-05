@@ -2,6 +2,9 @@
 
 ## 0.2.0 (unreleased)
 
+- **Minimap button** of our own (Pergamino 2): left click opens the card, right click the league, drag it around the minimap; `/bingo minimapa on|off`. Pergamino 2 also brings wider bookmarks (the labels fit on one line) and scroll bars only when the page overflows.
+- Without a guild (or with nobody else on the addon yet) the note sits right under "Your guild" instead of at the bottom of an empty list; "1 pt" and "1 goal imported" in the singular; clicking the book brings it over any other open book.
+- Fixed: `Bindings.xml` is no longer listed in the TOC (the game reads it by name; listed, it logged XML warnings), and `UnitName("player")` keeps to one value.
 - **The window is an open book** (the shared Pergamino skin, vendored in `Libs/Pergamino`): the card stamped on the left page, bookmarks for the card, the league and the officers' tools (the last one only for officers), the exchange as a parchment card, inviting empty states and tooltips on the bookmarks. No Blizzard frame templates left.
 - **Language option**: `/bingo idioma es|en|auto`, kept in the settings, so the addon can speak Spanish on an English client.
 - Own icon in the addon compartment and a key binding to open the window (Key Bindings → AddOns).

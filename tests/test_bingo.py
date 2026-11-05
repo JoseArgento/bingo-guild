@@ -945,7 +945,7 @@ def test_the_exchange_window(me):
 def test_the_window_is_a_pergamino_book(me):
     me.run("ns.UI.Toggle()")
     f = me.ns.UI.frame
-    assert me.run("return Pergamino.VERSION") == 1
+    assert me.run("return Pergamino.VERSION") == 2
     assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
     assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
     assert f.title.GetText(f.title) == "Guild Bingo"
@@ -966,7 +966,7 @@ def test_bookmarks_turn_the_page_and_have_tooltips(me):
     tab._scripts.OnClick(tab)
     assert f.selected == "liga" and me.ns.UI.view == "league"
     assert f.pages.liga.right.IsShown(f.pages.liga.right) and not f.pages.carton.right.IsShown(f.pages.carton.right)
-    assert f.tabs.liga.width == 142 and f.tabs.carton.width == 128  # the open bookmark sticks out more
+    assert f.tabs.liga.width == 198 and f.tabs.carton.width == 184  # the open bookmark sticks out more
     tab._scripts.OnEnter(tab)
     lines = me.run("return table.concat(GameTooltip.lines or {}, '\\n')")
     assert "one per square" in lines
@@ -1057,3 +1057,29 @@ def test_the_exchange_is_a_parchment_card(me):
     assert f.title.GetText(f.title) == "Export / import goals"
     f.close._scripts.OnClick(f.close)
     assert not f.IsShown(f)
+
+
+# minimap button --------------------------------------------------------------------------------
+
+
+def test_the_minimap_button_opens_the_card_and_remembers_where_it_was():
+    me = Client().login()
+    b = me.lua.globals().BingoDeLaGuildMinimapButton
+    assert b is not None and b._shown is True
+    assert b.icon.texture.endswith("BingoDeLaGuild\\Media\\icon")
+    me.run("ns.MinimapButton():GetScript('OnClick')(ns.MinimapButton(), 'LeftButton')")
+    assert me.run("return ns.UI.frame:IsShown()")
+    me.run("ns.UI.Toggle(); ns.MinimapButton():GetScript('OnClick')(ns.MinimapButton(), 'RightButton')")
+    assert me.run("return ns.UI.frame.selected") == "liga"
+    me.run(
+        "MOCK.cursorX, MOCK.cursorY = 1200, 500; local b = ns.MinimapButton();"
+        " b:GetScript('OnDragStart')(b); b:GetScript('OnUpdate')(b); b:GetScript('OnDragStop')(b)"
+    )
+    assert me.run("return ns.db.settings.minimapAngle") == 0
+    me.run("SlashCmdList.BINGODELAGUILD('minimapa off')")
+    assert b._shown is False and me.run("return ns.db.settings.minimap") is False
+    assert any("Minimap button off" in line for line in me.chat())
+    # the next session keeps it hidden and in its place
+    again = Client(saved=me.m.savedVariables("BingoDeLaGuildDB")).login()
+    b2 = again.lua.globals().BingoDeLaGuildMinimapButton
+    assert b2._shown is False and b2.angle == 0

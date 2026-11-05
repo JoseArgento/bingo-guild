@@ -209,6 +209,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
 		end
 		ns.Count("day", date("%Y-%m-%d"))
 		ns.Count("zone", GetRealZoneText())
+		ns.MinimapButton()
 		checkCard()
 		-- the weekly reset can happen while you play
 		C_Timer.NewTicker(60, function()
@@ -278,6 +279,13 @@ SlashCmdList.BINGODELAGUILD = function(msg)
 			ns.Print(L.LANG_SET:format(lang))
 		else
 			ns.Print(L.LANG_HELP)
+		end
+	elseif msg:match("^minimapa") or msg:match("^minimap") then
+		local on = msg:match("^%S+%s+(%S+)")
+		if on == "on" or on == "off" then
+			ns.SetMinimapShown(on == "on")
+		else
+			ns.SetMinimapShown(ns.db.settings.minimap == false)
 		end
 	elseif msg == "help" or msg == "ayuda" then
 		ns.Print(L.HELP)

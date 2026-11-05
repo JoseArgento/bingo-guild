@@ -18,4 +18,5 @@ Goals.lua
 Core.lua
 Sync.lua
 UI.lua
+Minimap.lua
 Events.lua
