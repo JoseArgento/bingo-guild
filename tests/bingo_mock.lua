@@ -126,3 +126,21 @@ function GetGuildRosterInfo(i)
 		return r[1], "Rank" .. r[2], r[2]
 	end
 end
+
+-- strings the suggestion popup uses, and what the new goals ask the client
+ADD = "Add"
+DELETE = "Delete"
+MOCK.instance = nil -- { name, type } when inside one
+function GetInstanceInfo()
+	if MOCK.instance then
+		return MOCK.instance.name, MOCK.instance.type, 0, "", 5, 0, false, 0, 0
+	end
+	return "Azeroth", "none", 0, "", 0, 0, false, 0, 0
+end
+MOCK.legacyPoints = {} -- achievementID -> points
+C_Traits = {
+	GetTraitCurrencyForAchievement = function(currencyID, achievementID)
+		assert(currencyID == 4225, "Legacy points currency")
+		return MOCK.legacyPoints[achievementID] or 0
+	end,
+}

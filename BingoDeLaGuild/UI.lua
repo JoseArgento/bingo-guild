@@ -42,6 +42,67 @@ StaticPopupDialogs.BINGODELAGUILD_GOAL = {
 	hideOnEscape = 1,
 }
 
+-- anyone proposes a goal for the officers
+StaticPopupDialogs.BINGODELAGUILD_SUGGEST = {
+	text = "%s",
+	button1 = ACCEPT,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 50,
+	OnShow = function(dialog)
+		dialog:GetEditBox():SetText("")
+		dialog:GetEditBox():SetFocus()
+	end,
+	OnAccept = function(dialog)
+		ns.UI.SendSuggestion(dialog:GetEditBox():GetText())
+	end,
+	EditBoxOnEnterPressed = function(editBox)
+		local dialog = editBox:GetParent()
+		ns.UI.SendSuggestion(editBox:GetText())
+		dialog:Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+-- an officer goes through the suggestions one by one: add it, drop it, or later
+StaticPopupDialogs.BINGODELAGUILD_REVIEW = {
+	text = "%s",
+	button1 = ADD,
+	button2 = DELETE,
+	button3 = CANCEL,
+	OnAccept = function()
+		ns.TakeSuggestion(1, true)
+		ns.UI.ReviewNext()
+	end,
+	OnCancel = function(_, _, reason)
+		if reason == "clicked" then
+			ns.TakeSuggestion(1, false)
+			ns.UI.ReviewNext()
+		end
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+function UI.SendSuggestion(text)
+	if ns.Suggest(text) then
+		ns.Print(L.SUGGESTED)
+	else
+		local _, inGuild = ns.Scope()
+		ns.Print(not inGuild and L.NO_GUILD or ns.IsTrial() and L.TRIAL or L.CANT_SEND)
+	end
+end
+
+function UI.ReviewNext()
+	local s = ns.Suggestions()[1]
+	if s then
+		StaticPopup_Show("BINGODELAGUILD_REVIEW", L.REVIEW:format(s.by, s.text))
+	end
+end
+
 local function names(list, max)
 	if #list <= max then
 		return table.concat(list, ", ")
@@ -67,9 +128,9 @@ local function cellTooltip(cell)
 		local card = ns.OfficerCard()
 		GameTooltip:AddLine(L.CARD_BY:format(card and card.by or "?"), 0.7, 0.7, 0.7)
 	end
-	if g.count then
+	if g.count or g.set then
 		GameTooltip:AddLine(ns.Done(id) and L.AUTO or L.AUTO_TOO, 0.7, 0.7, 0.7, true)
-		if g.need > 1 then
+		if g.count and g.need > 1 then
 			GameTooltip:AddLine(L.PROGRESS:format(ns.Progress(g), g.need), 1, 0.82, 0)
 		end
 	else
@@ -179,7 +240,7 @@ local function build()
 	-- officers write this week's goals and publish them
 	f.addGoal = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
 	f.addGoal:SetSize(SIDE_W, 22)
-	f.addGoal:SetPoint("BOTTOM", f.league, "TOP", 0, 30)
+	f.addGoal:SetPoint("BOTTOM", f.league, "TOP", 0, 56)
 	f.addGoal:SetText(L.ADD_GOAL)
 	f.addGoal:SetScript("OnClick", function()
 		StaticPopup_Show("BINGODELAGUILD_GOAL", L.GOAL_PROMPT)
@@ -189,6 +250,25 @@ local function build()
 	f.publish:SetPoint("TOP", f.addGoal, "BOTTOM", 0, -4)
 	f.publish:SetScript("OnClick", function()
 		ns.Publish()
+	end)
+	f.review = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.review:SetSize(SIDE_W, 22)
+	f.review:SetPoint("BOTTOM", f.addGoal, "TOP", 0, 4)
+	f.review:SetScript("OnClick", UI.ReviewNext)
+	f.exchange = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.exchange:SetSize(SIDE_W, 22)
+	f.exchange:SetPoint("BOTTOM", f.review, "TOP", 0, 4)
+	f.exchange:SetText(L.EXCHANGE)
+	f.exchange:SetScript("OnClick", function()
+		UI.ToggleExchange()
+	end)
+	-- anyone in the guild proposes a goal to the officers
+	f.suggest = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
+	f.suggest:SetSize(SIDE_W, 22)
+	f.suggest:SetPoint("BOTTOM", f.league, "TOP", 0, 4)
+	f.suggest:SetText(L.SUGGEST)
+	f.suggest:SetScript("OnClick", function()
+		StaticPopup_Show("BINGODELAGUILD_SUGGEST", L.SUGGEST_PROMPT)
 	end)
 
 	f.announce = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
@@ -284,11 +364,16 @@ function UI.Refresh()
 	end
 	f.league:SetText(UI.view == "league" and L.WEEK_VIEW or L.LEAGUE)
 	local officerNow = ns.IAmOfficer()
+	local _, inGuild = ns.Scope()
 	f.addGoal:SetShown(officerNow)
 	f.publish:SetShown(officerNow)
 	f.publish:SetText(L.PUBLISH:format(#ns.Drafts()))
 	f.publish:SetEnabled(#ns.Drafts() > 0)
-	local _, inGuild = ns.Scope()
+	f.review:SetShown(officerNow)
+	f.review:SetText(L.REVIEW_BTN:format(#ns.Suggestions()))
+	f.review:SetEnabled(#ns.Suggestions() > 0)
+	f.exchange:SetShown(officerNow)
+	f.suggest:SetShown(inGuild and not officerNow and not ns.IsTrial())
 	if not inGuild then
 		f.note:SetText(L.NO_GUILD)
 	elseif ns.IsTrial() then
@@ -300,6 +385,62 @@ function UI.Refresh()
 	end
 	f.announce:SetShown(inGuild and lines > 0)
 	f.announce:SetEnabled(true)
+end
+
+-- Export / import of the goal list: a small window with the text, "Copiar" is just selecting it.
+local function buildExchange()
+	local f = CreateFrame("Frame", ADDON .. "ExchangeFrame", UIParent, "BasicFrameTemplateWithInset")
+	f:SetSize(360, 300)
+	f:SetPoint("CENTER")
+	f:SetFrameStrata("DIALOG")
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:Hide()
+	f.TitleText:SetText(L.EXCHANGE)
+	tinsert(UISpecialFrames, ADDON .. "ExchangeFrame")
+	local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("TOPLEFT", 12, -30)
+	hint:SetPoint("TOPRIGHT", -12, -30)
+	hint:SetJustifyH("LEFT")
+	hint:SetWordWrap(true)
+	hint:SetText(L.EXCHANGE_HINT)
+	local body = CreateFrame("Frame", nil, f, "ScrollingEditBoxTemplate")
+	body:SetPoint("TOPLEFT", 12, -62)
+	body:SetPoint("BOTTOMRIGHT", -30, 40)
+	local bar = CreateFrame("EventFrame", nil, f, "MinimalScrollBar")
+	bar:SetPoint("TOPLEFT", body, "TOPRIGHT", 4, 0)
+	bar:SetPoint("BOTTOMLEFT", body, "BOTTOMRIGHT", 4, 0)
+	ScrollUtil.RegisterScrollBoxWithScrollBar(body:GetScrollBox(), bar)
+	f.body = body
+	local import = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	import:SetSize(120, 22)
+	import:SetPoint("BOTTOMRIGHT", -12, 10)
+	import:SetText(L.IMPORT)
+	import:SetScript("OnClick", function()
+		local n = ns.ImportGoals(body:GetEditBox():GetText())
+		ns.Print(n and L.IMPORTED:format(n) or L.NOT_AN_EXPORT)
+		if n then
+			f:Hide()
+		end
+	end)
+	f.importButton = import
+	UI.exchange = f
+	return f
+end
+
+function UI.ToggleExchange()
+	local f = UI.exchange or buildExchange()
+	if f:IsShown() then
+		f:Hide()
+		return
+	end
+	f.body:SetText(ns.ExportGoals() or "")
+	f:Show()
+	f.body:GetEditBox():SetFocus()
+	f.body:GetEditBox():HighlightText()
 end
 
 function UI.Toggle()
@@ -315,3 +456,4 @@ end
 
 ns.On("card", UI.Refresh)
 ns.On("guild", UI.Refresh)
+ns.On("suggest", UI.Refresh)

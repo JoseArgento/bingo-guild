@@ -37,6 +37,37 @@ end
 local currentWeek, currentScope
 local lastDeath, zonePending
 
+-- Inside one of Forever's new dungeons? GetInstanceInfo gives the localized name; the list is English (⏳ other
+-- locales: those squares are clicked by hand).
+local function newDungeonHere()
+	local name, instanceType = GetInstanceInfo()
+	if instanceType == "party" and type(name) == "string" and not issecretvalue(name) and ns.NEW_DUNGEONS[name] then
+		return name
+	end
+end
+
+local function isSkyborne()
+	local race, raceFile = UnitRace("player")
+	for _, v in ipairs({ raceFile, race }) do
+		if type(v) == "string" and not issecretvalue(v) and v:lower():find("skyborne", 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Legacy points come with achievements; Blizzard_LegacyAchievementOverrides.lua asks the same way, with
+-- Constants.LegacyConsts.LEGACY_POINTS_TRAIT_CURRENCY_ID = 4225 (LegacyConstantsDocumentation.lua, 1.60.1)
+local LEGACY_CURRENCY = 4225
+local function legacyPoints(achievementID)
+	if type(achievementID) ~= "number" or issecretvalue(achievementID) then
+		return 0
+	end
+	local f = C_Traits and C_Traits.GetTraitCurrencyForAchievement
+	local amount = f and f(LEGACY_CURRENCY, achievementID)
+	return (type(amount) == "number" and not issecretvalue(amount)) and amount or 0
+end
+
 local function checkCard()
 	local week, scope = ns.Week(), ns.Scope()
 	if week ~= currentWeek or scope ~= currentScope then
@@ -66,8 +97,22 @@ local handlers = {
 		lastDeath = now
 		ns.Count("die")
 	end,
-	PLAYER_LEVEL_UP = function()
+	PLAYER_LEVEL_UP = function(level)
 		ns.Count("level")
+		if type(level) == "number" and level >= 10 and isSkyborne() then
+			ns.Count("skyborne10", ns.CharKey()) -- ⏳ the race token of the Skyborne on a live client
+		end
+	end,
+	ACHIEVEMENT_EARNED = function(achievementID)
+		if legacyPoints(achievementID) > 0 then
+			ns.Count("legacy")
+		end
+	end,
+	PLAYER_ENTERING_WORLD = function()
+		local name = newDungeonHere()
+		if name then
+			ns.Count("newdungeon", name)
+		end
 	end,
 	ENCOUNTER_END = function(_, _, _, _, success)
 		if success == 1 then
@@ -91,6 +136,10 @@ local handlers = {
 		C_Timer.After(2, function()
 			zonePending = false
 			ns.Count("zone", GetRealZoneText())
+			local name = newDungeonHere()
+			if name then
+				ns.Count("newdungeon", name)
+			end
 		end)
 	end,
 	DUEL_FINISHED = function()
@@ -190,6 +239,25 @@ SlashCmdList.BINGODELAGUILD = function(msg)
 		if ns.IAmOfficer() then
 			ns.AddDraft(raw:sub(6)) -- as typed, not lowercased
 			ns.Print(L.DRAFTS:format(#ns.Drafts(), table.concat(ns.Drafts(), " · ")))
+		else
+			ns.Print(L.NOT_OFFICER)
+		end
+	elseif msg:match("^sugerir ") or msg:match("^suggest ") then
+		ns.UI.SendSuggestion(raw:sub(raw:find(" ") + 1))
+	elseif msg == "sugerencias" or msg == "suggestions" then
+		if ns.IAmOfficer() then
+			local list = ns.Suggestions()
+			ns.Print(L.SUGGESTIONS:format(#list))
+			for _, s in ipairs(list) do
+				ns.Print(s.by .. ": " .. s.text)
+			end
+			ns.UI.ReviewNext()
+		else
+			ns.Print(L.NOT_OFFICER)
+		end
+	elseif msg == "exportar" or msg == "export" then
+		if ns.IAmOfficer() then
+			ns.UI.ToggleExchange()
 		else
 			ns.Print(L.NOT_OFFICER)
 		end

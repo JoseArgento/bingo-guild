@@ -29,6 +29,7 @@ function ns.InitDB()
 	db.guilds = type(db.guilds) == "table" and db.guilds or {}
 	db.officer = type(db.officer) == "table" and db.officer or {} -- [scope][week] = { by, ver, goals }
 	db.drafts = type(db.drafts) == "table" and db.drafts or {} -- [scope] = { "goal", ... } an officer is writing
+	db.suggest = type(db.suggest) == "table" and db.suggest or {} -- [scope] = { { by, text, t }, ... } for officers
 	db.settings = type(db.settings) == "table" and db.settings or {}
 	db.settings.officerRank = db.settings.officerRank or 1 -- cards are accepted from the leader (0) and rank 1
 	ns.db = db
@@ -202,7 +203,13 @@ function ns.Done(id)
 		return false
 	end
 	local w = ns.ThisWeek()
-	return w.manual[id] == true or (g.count ~= nil and (w.count[g.count] or 0) >= g.need)
+	if w.manual[id] == true then
+		return true
+	end
+	if g.set then
+		return (w.sets[g.set] and w.sets[g.set][g.key]) == true
+	end
+	return g.count ~= nil and (w.count[g.count] or 0) >= g.need
 end
 
 function ns.Marks(card)

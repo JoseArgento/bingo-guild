@@ -109,7 +109,7 @@ def deliver(src: Client, *dests: Client):
             d.receive(text, sender=f"{src.name}-Forever")
 
 
-def card_message(c: Client, marks: str | None = None, week: str | None = None, pool: int = 2, key: str | None = None):
+def card_message(c: Client, marks: str | None = None, week: str | None = None, pool: int = 3, key: str | None = None):
     key = key or c.ns.CardKey()
     return f"C|{pool}|{week or c.week()}|{key}|{marks or '0' * 12 + '1' + '0' * 12}"
 
@@ -165,9 +165,11 @@ def test_drawing_a_card_leaves_math_random_alone(me):
 def test_the_pool_is_versioned():
     """Changing the goals changes everyone's card: the version must go up with it (and this list too)."""
     ids = re.findall(r'\{ id = "(\w+)"', (ADDON / "Goals.lua").read_text(encoding="utf-8"))
-    expected = (TESTS / "pool_v2.txt").read_text(encoding="utf-8").split()
+    expected = (TESTS / "pool_v3.txt").read_text(encoding="utf-8").split()
     version = int(re.search(r"POOL_VERSION = (\d+)", (ADDON / "Goals.lua").read_text(encoding="utf-8")).group(1))
-    assert version == 2 and ids == expected, "goals changed: bump POOL_VERSION and add tests/pool_v<N>.txt"
+    assert version == 3 and ids == expected, "goals changed: bump POOL_VERSION and add tests/pool_v<N>.txt"
+    # the previous pool stays on disk so an old client's card can be reasoned about
+    assert (TESTS / "pool_v2.txt").exists()
     assert len(set(ids)) == len(ids) >= 30
 
 
@@ -364,7 +366,7 @@ def test_a_newcomer_gets_the_cards_by_asking():
     ana = Client("Ana").login()
     ana.timers()
     sent = ana.take_sent()
-    assert any(t.startswith("Q|2|") for _, t, _ in sent)
+    assert any(t.startswith("Q|3|") for _, t, _ in sent)
     for _, text, _ in sent:
         jose.receive(text, sender="Ana-Forever")
     deliver(jose, ana)
@@ -375,7 +377,7 @@ def test_many_questions_get_one_answer(me):
     me.timers()
     me.take_sent()
     for who in ["Ana", "Beto", "Caro"]:
-        me.receive(f"Q|2|{me.week()}", sender=f"{who}-Forever")
+        me.receive(f"Q|3|{me.week()}", sender=f"{who}-Forever")
     me.timers()
     answers = [t for _, t, _ in me.take_sent() if t.startswith("C|")]
     assert len(answers) == 1
@@ -390,7 +392,7 @@ def test_marks_go_out_a_moment_after_a_click(me):
     me.timers()
     sent = me.take_sent()
     assert len(sent) == 1
-    assert sent[0] == ("BingoGuild1", f"C|2|{me.week()}|{me.ns.CardKey()}|{me.marks()}", "GUILD")
+    assert sent[0] == ("BingoGuild1", f"C|3|{me.week()}|{me.ns.CardKey()}|{me.marks()}", "GUILD")
 
 
 @pytest.mark.parametrize(
@@ -399,20 +401,20 @@ def test_marks_go_out_a_moment_after_a_click(me):
         {"channel": "PARTY"},
         {"channel": "WHISPER"},
         {"prefix": "OtroAddon"},
-        {"text": "C|2|WEEK|KEY|0101"},  # too few marks
-        {"text": "C|2|WEEK|KEY|" + "0" * 25},  # the free square unmarked
-        {"text": "C|2|WEEK|KEY|" + "2" * 25},
-        {"text": "C|2|WEEK|KEY|" + "1" * 25 + "|os.exit()"},
-        {"text": "C|2|WEEK|zzzzzz|" + "1" * 25},  # not a card name
-        {"text": "C|2|WEEK|" + "1" * 25},  # no card name (version 1 style)
+        {"text": "C|3|WEEK|KEY|0101"},  # too few marks
+        {"text": "C|3|WEEK|KEY|" + "0" * 25},  # the free square unmarked
+        {"text": "C|3|WEEK|KEY|" + "2" * 25},
+        {"text": "C|3|WEEK|KEY|" + "1" * 25 + "|os.exit()"},
+        {"text": "C|3|WEEK|zzzzzz|" + "1" * 25},  # not a card name
+        {"text": "C|3|WEEK|" + "1" * 25},  # no card name (version 1 style)
         {"text": "loadstring('x')()"},
-        {"text": "C|2|WEEK|KEY|" + "1" * 200},
-        {"text": "C|2|999|KEY|" + "1" * 25},  # another week
+        {"text": "C|3|WEEK|KEY|" + "1" * 200},
+        {"text": "C|3|999|KEY|" + "1" * 25},  # another week
         {"sender": "Josecito-Forever"},  # my own message coming back
     ],
 )
 def test_bad_messages_are_ignored(me, kwargs):
-    text = kwargs.pop("text", "C|2|WEEK|KEY|" + "1" * 25).replace("WEEK", me.week()).replace("KEY", me.ns.CardKey())
+    text = kwargs.pop("text", "C|3|WEEK|KEY|" + "1" * 25).replace("WEEK", me.week()).replace("KEY", me.ns.CardKey())
     me.receive(text, **kwargs)
     assert me.guild_cards() == {}
 
@@ -506,7 +508,7 @@ def test_the_weekly_reset_starts_a_clean_card(me):
     assert me.week() != old_week
     assert not me.done("die1") and not me.done("fall")
     me.timers()
-    assert any(t.startswith(f"Q|2|{me.week()}") for _, t, _ in me.take_sent())
+    assert any(t.startswith(f"Q|3|{me.week()}") for _, t, _ in me.take_sent())
 
 
 def test_saved_and_loaded():
@@ -643,33 +645,33 @@ def test_a_card_from_someone_who_is_not_an_officer_is_ignored():
 
 def test_unknown_senders_ask_for_the_roster(me):
     week = me.week()
-    me.receive(f"K|2|{week}|123|1", sender="Nadie-Forever")
+    me.receive(f"K|3|{week}|123|1", sender="Nadie-Forever")
     assert me.m.rosterRequests >= 1
     assert me.ns.OfficerCard() is None
 
 
 def test_half_a_card_is_not_used(me):
     week = me.week()
-    me.receive(f"K|2|{week}|123|2", sender="Ofi-Forever")
-    me.receive(f"G|2|{week}|123|1|Una sola", sender="Ofi-Forever")
+    me.receive(f"K|3|{week}|123|2", sender="Ofi-Forever")
+    me.receive(f"G|3|{week}|123|1|Una sola", sender="Ofi-Forever")
     assert me.ns.OfficerCard() is None
-    me.receive(f"G|2|{week}|123|2|La otra", sender="Ofi-Forever")
+    me.receive(f"G|3|{week}|123|2|La otra", sender="Ofi-Forever")
     card = me.ns.OfficerCard()
     assert list(card.goals.values()) == ["Una sola", "La otra"]
 
 
 @pytest.mark.parametrize("count", ["0", "25", "x"])
 def test_bad_card_sizes(me, count):
-    me.receive(f"K|2|{me.week()}|123|{count}", sender="Ofi-Forever")
-    me.receive(f"G|2|{me.week()}|123|1|Algo", sender="Ofi-Forever")
+    me.receive(f"K|3|{me.week()}|123|{count}", sender="Ofi-Forever")
+    me.receive(f"G|3|{me.week()}|123|1|Algo", sender="Ofi-Forever")
     assert me.ns.OfficerCard() is None
 
 
 def test_an_older_card_does_not_replace_a_newer_one(me):
     w = me.week()
     for ver, text in [("200", "Nueva"), ("100", "Vieja")]:
-        me.receive(f"K|2|{w}|{ver}|1", sender="Lider-Forever")
-        me.receive(f"G|2|{w}|{ver}|1|{text}", sender="Lider-Forever")
+        me.receive(f"K|3|{w}|{ver}|1", sender="Lider-Forever")
+        me.receive(f"G|3|{w}|{ver}|1|{text}", sender="Lider-Forever")
     assert list(me.ns.OfficerCard().goals.values()) == ["Nueva"]
 
 
@@ -733,3 +735,185 @@ def test_new_week_is_announced(me):
     me.run("MOCK.now = MOCK.resetAt + 60")
     me.m.tick()
     assert any("New week, new card" in line for line in me.chat())
+
+
+# pool 3: Forever is live ------------------------------------------------------------------------
+
+
+def test_a_legacy_point_marks_itself(me):
+    me.run("MOCK.legacyPoints[9001] = 0")
+    me.fire("ACHIEVEMENT_EARNED", 9001)
+    assert not me.done("legacy")
+    me.run("MOCK.legacyPoints[9002] = 1")
+    me.fire("ACHIEVEMENT_EARNED", 9002)
+    assert me.done("legacy")
+
+
+def test_a_skyborne_at_ten(me):
+    me.fire("PLAYER_LEVEL_UP", 10)
+    assert not me.done("sky10")  # a human
+    me.run("MOCK.player.race = 'Skyborne'")
+    me.fire("PLAYER_LEVEL_UP", 9)
+    assert not me.done("sky10")
+    me.fire("PLAYER_LEVEL_UP", 10)
+    assert me.done("sky10")
+
+
+def test_the_new_dungeons_mark_themselves_by_name(me):
+    me.run("MOCK.instance = { name = 'Hall of Thanes', type = 'party' }")
+    me.fire("PLAYER_ENTERING_WORLD")
+    assert me.done("dg_thanes") and me.done("newdungeon") and not me.done("dg_dalaran")
+    me.run("MOCK.instance = { name = 'Deadmines', type = 'party' }")  # not a new one
+    me.fire("ZONE_CHANGED_NEW_AREA")
+    me.timers()
+    assert me.ns.Progress(me.ns.Goal("newdungeon3")) == 1
+    for name in ["City of Dalaran", "Blackmaw Hold", "Hall of Thanes"]:
+        me.run(f"MOCK.instance = {{ name = '{name}', type = 'party' }}")
+        me.fire("ZONE_CHANGED_NEW_AREA")
+        me.timers()
+    assert me.done("newdungeon3") and me.done("dg_dalaran")
+    me.run("ns.UI.Toggle()")
+    cell = [c for c in me.ns.UI.cells.values() if c.goalID == "dg_thanes"]
+    if cell:  # it is on this week's card: the tooltip says it marks itself
+        cell[0]._scripts.OnEnter(cell[0])
+        assert any("Marks itself" in line for line in me.lua.globals().GameTooltip.lines.values())
+
+
+def test_a_raid_or_the_open_world_is_not_a_new_dungeon(me):
+    me.run("MOCK.instance = { name = 'Hall of Thanes', type = 'raid' }")
+    me.fire("PLAYER_ENTERING_WORLD")
+    assert not me.done("dg_thanes")
+
+
+# suggestions (#11) ------------------------------------------------------------------------------
+
+
+def suggestions(c):
+    s = c.ns.Suggestions()
+    return [(s[i].by, s[i].text) for i in range(1, len(s) + 1)]
+
+
+def test_a_suggestion_reaches_the_officers_only():
+    ana, ofi, me = Client("Ana").login(), officer(), Client().login()
+    for c in (ana, ofi, me):
+        c.timers()
+        c.take_sent()
+    ana.lua.globals().SlashCmdList.BINGODELAGUILD("sugerir Bailar con un Murloc")
+    sent = ana.take_sent()
+    assert sent == [("BingoGuild1", f"S|3|{ana.week()}|Bailar con un Murloc", "GUILD")]
+    assert any("Suggestion sent" in line for line in ana.chat())
+    for c in (ofi, me):
+        c.receive(sent[0][1], sender="Ana-Forever")
+    assert suggestions(ofi) == [("Ana", "Bailar con un Murloc")]
+    assert suggestions(me) == []  # not an officer: dropped
+    assert "suggest" not in me.save() or '"Ana"' not in me.save()
+
+
+def test_suggestions_are_deduped_capped_and_rate_limited():
+    ofi = officer()
+    w = ofi.week()
+    for _ in range(3):
+        ofi.receive(f"S|3|{w}|Lo mismo", sender="Ana-Forever")
+    assert suggestions(ofi) == [("Ana", "Lo mismo")]
+    ofi.receive(f"S|3|{w}|Lo mismo", sender="Beto-Forever")  # another sender: its own
+    assert len(suggestions(ofi)) == 2
+    for i in range(10):  # more than 5 in 10 seconds from one sender: the rest wait
+        ofi.receive(f"S|3|{w}|Idea {i}", sender="Caro-Forever")
+    assert len(suggestions(ofi)) == 2 + 5
+    ofi.run("MOCK.now = MOCK.now + 11")
+    n = 0
+    while len(suggestions(ofi)) < 50:
+        ofi.receive(f"S|3|{w}|Otra {n}", sender=f"P{n % 40}-Forever")
+        n += 1
+        if n % 5 == 0:
+            ofi.run("MOCK.now = MOCK.now + 11")
+    ofi.run("MOCK.now = MOCK.now + 11")
+    ofi.receive(f"S|3|{w}|Una de más", sender="Zeta-Forever")
+    assert len(suggestions(ofi)) == 50
+
+
+def test_bad_suggestions_are_ignored():
+    ofi = officer()
+    w = ofi.week()
+    ofi.receive(f"S|3|{w}|", sender="Ana-Forever")
+    ofi.receive(f"S|3|{w}|   ", sender="Ana-Forever")
+    ofi.receive(f"S|3|{int(w) - 604800}|Vieja", sender="Ana-Forever")
+    ofi.receive(f"S|2|{w}|Otra versión", sender="Ana-Forever")
+    assert suggestions(ofi) == []
+    ofi.receive(f"S|3|{w}|con |cffff0000color|r", sender="Ana-Forever")
+    assert suggestions(ofi) == [("Ana", "con cffff0000colorr")]
+
+
+def test_an_officer_adds_or_drops_a_suggestion():
+    ofi = officer()
+    w = ofi.week()
+    ofi.receive(f"S|3|{w}|Primera", sender="Ana-Forever")
+    ofi.receive(f"S|3|{w}|Segunda", sender="Beto-Forever")
+    ofi.run("ns.UI.Toggle()")
+    f = ofi.ns.UI.frame
+    assert f.review.GetText(f.review) == "Suggestions (2)" and f.review.IsShown(f.review)
+    f.review._scripts.OnClick(f.review)
+    popups = ofi.m.popups
+    assert popups[len(popups)].text == "Ana suggests: Primera"
+    ofi.lua.globals().StaticPopupDialogs.BINGODELAGUILD_REVIEW.OnAccept()
+    assert list(ofi.ns.Drafts().values()) == ["Primera"] and suggestions(ofi) == [("Beto", "Segunda")]
+    ofi.lua.globals().StaticPopupDialogs.BINGODELAGUILD_REVIEW.OnCancel(None, None, "clicked")
+    assert suggestions(ofi) == [] and list(ofi.ns.Drafts().values()) == ["Primera"]
+    assert f.review.GetText(f.review) == "Suggestions (0)"
+
+
+def test_trial_accounts_cannot_suggest():
+    c = Client(trial=True).login()
+    c.take_sent()
+    c.lua.globals().SlashCmdList.BINGODELAGUILD("sugerir Algo")
+    assert c.take_sent() == []
+    assert any("Trial accounts" in line for line in c.chat())
+
+
+def test_the_suggest_button_is_for_members_not_officers():
+    for c, shown in [(Client().login(), True), (officer(), False), (Client(guild=None).login(), False)]:
+        c.run("ns.UI.Toggle()")
+        f = c.ns.UI.frame
+        assert bool(f.suggest.IsShown(f.suggest)) is shown
+
+
+# export / import of the goal list -----------------------------------------------------------------
+
+
+def test_export_and_import_round_trip():
+    ofi = officer()
+    assert ofi.ns.ExportGoals() is None
+    publish_goals = ["Bailar en Ventormenta", "Pescar en Forjaz", "Con ñandú"]
+    for g in publish_goals:
+        ofi.lua.globals().SlashCmdList.BINGODELAGUILD("meta " + g)
+    text = ofi.ns.ExportGoals()
+    assert text == "BINGO1:\nBailar en Ventormenta\nPescar en Forjaz\nCon ñandú"
+    other = officer("Lider")
+    assert other.ns.ImportGoals(text) == 3
+    assert list(other.ns.Drafts().values()) == publish_goals
+    assert other.ns.ImportGoals("hola\nchau") is None  # not an export: drafts untouched
+    assert list(other.ns.Drafts().values()) == publish_goals
+
+
+def test_import_cleans_and_caps():
+    ofi = officer()
+    lines = ["BINGO1:  "] + [f"meta |{i}| " + "x" * 80 for i in range(30)] + ["", "   "]
+    n = ofi.ns.ImportGoals("\r\n".join(lines))
+    assert n == 24
+    drafts = list(ofi.ns.Drafts().values())
+    assert len(drafts) == 24 and all("|" not in d and len(d.encode()) <= 50 for d in drafts)
+    assert drafts[0].startswith("meta 0 xxx")
+
+
+def test_the_exchange_window(me):
+    ofi = officer()
+    ofi.lua.globals().SlashCmdList.BINGODELAGUILD("meta Una")
+    ofi.lua.globals().SlashCmdList.BINGODELAGUILD("exportar")
+    f = ofi.ns.UI.exchange
+    assert f.IsShown(f) and f.body.GetEditBox(f.body).GetText(f.body.GetEditBox(f.body)) == "BINGO1:\nUna"
+    f.body.GetEditBox(f.body).SetText(f.body.GetEditBox(f.body), "BINGO1:\nOtra\nMás")
+    f.importButton._scripts.OnClick(f.importButton)
+    assert list(ofi.ns.Drafts().values()) == ["Otra", "Más"] and not f.IsShown(f)
+    assert any("2 goals imported" in line for line in ofi.chat())
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("exportar")
+    assert any("Only officers" in line for line in me.chat())

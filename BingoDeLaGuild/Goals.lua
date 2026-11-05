@@ -3,9 +3,25 @@ local _, ns = ...
 -- The goals a card is drawn from. Every player of a guild draws the same 24 for the week from this list, so
 -- the list is part of the card: change it (add, remove, reorder) and bump POOL_VERSION, or two versions of
 -- the addon would show different cards and compare marks that mean different things.
-ns.POOL_VERSION = 2 -- 2: goals of WoW Forever (camping, blueprints, the new dungeons...)
+ns.POOL_VERSION = 3 -- 3: Forever is live: the nine dungeons by name, Legacy points, Skyborne, pings...
 
--- count = the counter that marks it by itself (Events.lua), need = how many. No count: the player marks it.
+-- The nine dungeons new in Forever, by their English name as GetInstanceInfo() gives it on an English client
+-- (levels from Warcraft Tavern's dungeon list and gfinityesports, 9/10/2026). ⏳ Names on other locales: the
+-- squares of these dungeons mark themselves only on an English client; anyone can click them.
+ns.NEW_DUNGEONS = {
+	["Hall of Thanes"] = "13-18",
+	["Ruins of Lordaeron"] = "15-20",
+	["Excavation Site: Wetlands"] = "24-29",
+	["City of Dalaran"] = "28-33",
+	["The Drowned City"] = "35-40",
+	["Krol'dok Stronghold"] = "40-45",
+	["Alcaz Island Prison"] = "48-53",
+	["Blackmaw Hold"] = "55-60",
+	["Shaper's Terrace"] = "58-60",
+}
+
+-- count = the counter that marks it by itself (Events.lua), need = how many. set + key = done when that value
+-- was counted (a dungeon by name). Neither: the player marks it.
 ns.GOALS = {
 	-- they mark themselves
 	{ id = "die1", count = "die", need = 1, es = "Morir", en = "Die" },
@@ -51,8 +67,26 @@ ns.GOALS = {
 	{ id = "blueprint", es = "Conseguir un plano", en = "Get a blueprint" },
 	{ id = "wellfed", es = "Comer algo cocinado antes de pelear", en = "Eat something cooked before a fight" },
 	{ id = "transmog", es = "Transfigurar algo", en = "Transmog something" },
-	{ id = "newdungeon", es = "Hacer una de las mazmorras nuevas", en = "Run one of the new dungeons" },
 	{ id = "skyborne", es = "Agrupar con alguien Skyborne", en = "Group with a Skyborne" },
+	-- now that Forever is live (pool 3)
+	{ id = "newdungeon", count = "newdungeon", need = 1, es = "Hacer una de las mazmorras nuevas", en = "Run one of the new dungeons" },
+	{ id = "newdungeon3", count = "newdungeon", need = 3, es = "Hacer 3 mazmorras nuevas distintas", en = "Run 3 different new dungeons" },
+	{ id = "dg_thanes", set = "newdungeon", key = "Hall of Thanes", es = "Hall of Thanes (13-18)", en = "Hall of Thanes (13-18)" },
+	{ id = "dg_lordaeron", set = "newdungeon", key = "Ruins of Lordaeron", es = "Ruins of Lordaeron (15-20)", en = "Ruins of Lordaeron (15-20)" },
+	{ id = "dg_wetlands", set = "newdungeon", key = "Excavation Site: Wetlands", es = "Excavation Site: Wetlands (24-29)", en = "Excavation Site: Wetlands (24-29)" },
+	{ id = "dg_dalaran", set = "newdungeon", key = "City of Dalaran", es = "City of Dalaran (28-33)", en = "City of Dalaran (28-33)" },
+	{ id = "dg_drowned", set = "newdungeon", key = "The Drowned City", es = "The Drowned City (35-40)", en = "The Drowned City (35-40)" },
+	{ id = "dg_kroldok", set = "newdungeon", key = "Krol'dok Stronghold", es = "Krol'dok Stronghold (40-45)", en = "Krol'dok Stronghold (40-45)" },
+	{ id = "dg_alcaz", set = "newdungeon", key = "Alcaz Island Prison", es = "Alcaz Island Prison (48-53)", en = "Alcaz Island Prison (48-53)" },
+	{ id = "dg_blackmaw", set = "newdungeon", key = "Blackmaw Hold", es = "Blackmaw Hold (55-60)", en = "Blackmaw Hold (55-60)" },
+	{ id = "dg_shaper", set = "newdungeon", key = "Shaper's Terrace", es = "Shaper's Terrace (58-60)", en = "Shaper's Terrace (58-60)" },
+	{ id = "legacy", count = "legacy", need = 1, es = "Ganar un punto del Legado", en = "Earn a Legacy point" },
+	{ id = "sky10", count = "skyborne10", need = 1, es = "Subir un Skyborne a nivel 10", en = "Level a Skyborne to 10" },
+	{ id = "ping", es = "Marcar algo al grupo con un ping", en = "Ping something to the group" },
+	{ id = "otherfire", es = "Sentarte en la fogata de otro", en = "Sit at someone else's campfire" },
+	{ id = "gamepad", es = "Jugar un rato con control", en = "Play a while with a gamepad" },
+	{ id = "hidename", es = "Esconder tu segundo nombre", en = "Hide your second name" },
+	{ id = "meter", es = "Mirar el medidor de daño del juego", en = "Check the game's own damage meter" },
 }
 
 ns.GOAL = {}

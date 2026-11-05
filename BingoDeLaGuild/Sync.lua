@@ -6,6 +6,7 @@ local L = ns.L
 --   Q|<pool>|<week>                     "send me yours"
 --   K|<pool>|<week>|<ver>|<count>       an officer's card for the week: how many goals it has...
 --   G|<pool>|<week>|<ver>|<i>|<text>    ...and each of them
+--   S|<pool>|<week>|<text>              "I suggest this goal" (anyone; only officers keep them)
 -- What arrives is only ever parsed with patterns and stored as text: nothing received is run. Marks are only
 -- compared between players with the same card. An officer's card is only taken from someone whose guild rank
 -- is the leader's or the one under it (settings.officerRank), checked in the guild roster.
@@ -136,6 +137,95 @@ end
 function ns.ClearDrafts()
 	wipe(ns.Drafts())
 	ns.Fire("card")
+end
+
+-- The goal list as text, to keep or to pass to another officer: a header line and one goal per line.
+ns.EXPORT_HEADER = "BINGO1:"
+
+function ns.ExportGoals()
+	local drafts = ns.Drafts()
+	if #drafts == 0 then
+		return nil
+	end
+	return ns.EXPORT_HEADER .. "\n" .. table.concat(drafts, "\n")
+end
+
+-- Pasted text back into the drafts (replacing them). Each line is cleaned like a received goal; at most 24.
+-- Returns how many came in, or nil when the text is not an export.
+function ns.ImportGoals(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local first, rest = text:match("^%s*(BINGO1:)[ \t]*\r?\n?(.*)$")
+	if first ~= ns.EXPORT_HEADER then
+		return nil
+	end
+	local goals = {}
+	for line in (rest .. "\n"):gmatch("([^\n]*)\n") do
+		local goal = ns.CleanGoal(line)
+		if goal then
+			goals[#goals + 1] = goal
+			if #goals == 24 then
+				break
+			end
+		end
+	end
+	local drafts = ns.Drafts()
+	wipe(drafts)
+	for i, goal in ipairs(goals) do
+		drafts[i] = goal
+	end
+	ns.Fire("card")
+	return #goals
+end
+
+-- Suggestions: anyone in the guild may propose a goal; officers see them and add or drop them.
+local MAX_SUGGESTIONS = 50
+
+function ns.Suggest(text)
+	text = ns.CleanGoal(text)
+	if not text then
+		return false
+	end
+	return send(table.concat({ "S", ns.POOL_VERSION, (ns.Week()), text }, "|"))
+end
+
+function ns.Suggestions()
+	local scope = ns.Scope()
+	ns.db.suggest[scope] = ns.db.suggest[scope] or {}
+	return ns.db.suggest[scope]
+end
+
+local function onSuggestion(sender, text)
+	if not ns.IAmOfficer() then
+		return
+	end
+	text = ns.CleanGoal(text)
+	if not text then
+		return
+	end
+	local list = ns.Suggestions()
+	for _, s in ipairs(list) do
+		if s.by == sender and s.text == text then
+			return
+		end
+	end
+	if #list >= MAX_SUGGESTIONS then
+		return
+	end
+	list[#list + 1] = { by = sender, text = text, t = time() }
+	ns.Fire("suggest")
+end
+
+-- Take suggestion i: onto the drafts (accept) or just away (drop). Returns the suggestion.
+function ns.TakeSuggestion(i, accept)
+	local list = ns.Suggestions()
+	local s = table.remove(list, i)
+	if s and accept then
+		ns.AddDraft(s.text)
+	end
+	ns.Fire("suggest")
+	return s
 end
 
 local function cardMessages(card)
@@ -308,7 +398,7 @@ function ns.OnAddonMessage(prefix, text, channel, sender)
 	if sender == ns.Me() then
 		return
 	end
-	local kind, pool, week, rest = text:match("^([CQKG])|(%d+)|(%d+)|?(.*)$")
+	local kind, pool, week, rest = text:match("^([CQKGS])|(%d+)|(%d+)|?(.*)$")
 	if not kind or not allowed(sender, (kind == "K" or kind == "G") and "officer" or "normal") then
 		return
 	end
@@ -357,6 +447,10 @@ function ns.OnAddonMessage(prefix, text, channel, sender)
 		local ver, i, goal = rest:match("^(%d+)|(%d+)|(.+)$")
 		if ver then
 			onOfficerPart(sender, "G", week, ver, i, goal)
+		end
+	elseif kind == "S" then
+		if rest ~= "" then
+			onSuggestion(sender, rest)
 		end
 	end
 end
