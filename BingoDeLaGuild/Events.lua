@@ -288,3 +288,10 @@ end
 function BingoDeLaGuild_OnAddonCompartmentLeave()
 	GameTooltip:Hide()
 end
+
+-- Key binding (Bindings.xml) and its names in the key bindings panel.
+_G["BingoDeLaGuild_Toggle"] = function()
+	ns.UI.Toggle()
+end
+_G["BINDING_HEADER_BINGODELAGUILD"] = "Bingo de la Guild"
+_G["BINDING_NAME_BINGODELAGUILD_TOGGLE"] = L.BINDING_TOGGLE

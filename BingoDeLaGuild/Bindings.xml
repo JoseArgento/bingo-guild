@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="BINGODELAGUILD_TOGGLE" header="BINGODELAGUILD" category="ADDONS">
+		BingoDeLaGuild_Toggle()
+	</Binding>
+</Bindings>

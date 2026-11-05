@@ -2,6 +2,7 @@ local _, ns = ...
 
 -- English is the fallback; Spanish for esES and esMX. Goal texts live in Goals.lua.
 local L = {
+	BINDING_TOGGLE = "Open / close",
 	TITLE = "Guild Bingo",
 	WEEK_UNTIL = "Card for the week, until %s",
 	MARKED = "%d of 25",
@@ -52,6 +53,7 @@ local L = {
 }
 
 local es = {
+	BINDING_TOGGLE = "Abrir / cerrar",
 	TITLE = "Bingo de la Guild",
 	WEEK_UNTIL = "Cartón de la semana, hasta el %s",
 	MARKED = "%d de 25",

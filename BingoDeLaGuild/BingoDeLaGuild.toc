@@ -6,7 +6,7 @@
 ## Author: José Argento
 ## Version: @project-version@
 ## SavedVariables: BingoDeLaGuildDB
-## IconTexture: Interface\Icons\INV_Misc_Note_02
+## IconTexture: Interface\AddOns\BingoDeLaGuild\Media\icon
 ## AddonCompartmentFunc: BingoDeLaGuild_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: BingoDeLaGuild_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: BingoDeLaGuild_OnAddonCompartmentLeave
@@ -18,3 +18,4 @@ Core.lua
 Sync.lua
 UI.lua
 Events.lua
+Bindings.xml
