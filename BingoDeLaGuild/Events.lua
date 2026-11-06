@@ -283,6 +283,13 @@ onSlash = function(msg)
 		else
 			ns.Print(L.LANG_HELP)
 		end
+	elseif msg:match("^minimapa%s+juntar") or msg:match("^minimap%s+merge") then
+		local on = msg:match("^%S+%s+%S+%s+(%S+)")
+		if on == "on" or on == "off" then
+			ns.SetMinimapMerged(on == "on")
+		else
+			ns.SetMinimapMerged(not ns.db.settings.minimapMerged)
+		end
 	elseif msg:match("^minimapa") or msg:match("^minimap") then
 		local on = msg:match("^%S+%s+(%S+)")
 		if on == "on" or on == "off" then
@@ -301,8 +308,13 @@ onSlash = function(msg)
 end
 SlashCmdList.BINGODELAGUILD = onSlash
 
+-- the addon compartment is not a frame, so its click is wrapped by hand (an error is kept, not thrown)
 function BingoDeLaGuild_OnAddonCompartmentClick()
-	ns.UI.Toggle()
+	if ns.guard then
+		ns.guard.Wrap(ns.UI.Toggle, "compartment")()
+	else
+		ns.UI.Toggle()
+	end
 end
 function BingoDeLaGuild_OnAddonCompartmentEnter(_, button)
 	GameTooltip:SetOwner(button, "ANCHOR_LEFT")

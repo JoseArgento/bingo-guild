@@ -945,7 +945,7 @@ def test_the_exchange_window(me):
 def test_the_window_is_a_pergamino_book(me):
     me.run("ns.UI.Toggle()")
     f = me.ns.UI.frame
-    assert me.run("return Pergamino.VERSION") == 5
+    assert me.run("return Pergamino.VERSION") == 7
     assert str(f.leather.texture).endswith("BingoDeLaGuild\\Libs\\Pergamino\\Media\\leather")
     assert f.pageL.texture.endswith("page") and f.pageR.texture.endswith("page") and f.spine.texture.endswith("spine")
     assert f.title.GetText(f.title) == "Guild Bingo"
@@ -1102,3 +1102,24 @@ def test_a_handler_error_is_kept_and_shown_not_thrown():
     assert "se rompio el conteo" in me.run("return ns.UI.errors.area.box._text")
     me.run("ns.UI.errors.clear:GetScript('OnClick')()")
     assert me.run("return #ns.db.errors") == 0
+
+
+def test_merging_the_minimap_buttons_hides_ours_and_the_hub_lists_it(me):
+    b = me.lua.globals().BingoDeLaGuildMinimapButton
+    entries = me.run("return Pergamino.MinimapHub.Entries()")
+    assert [e.label for e in entries.values()] == ["Guild Bingo"]
+    me.lua.globals().SlashCmdList.BINGODELAGUILD("minimapa juntar on")
+    assert me.run("return ns.db.settings.minimapMerged") is True and me.run("return Pergamino.MinimapHub.IsMerged()") is True
+    assert b._shown is False and me.lua.globals().PergaminoMinimapHub._shown is True
+    again = Client(saved=me.save()).login()
+    assert again.run("return Pergamino.MinimapHub.IsMerged()") is True
+    again.lua.globals().SlashCmdList.BINGODELAGUILD("minimap merge off")
+    assert again.lua.globals().BingoDeLaGuildMinimapButton._shown is True
+
+
+def test_an_error_in_the_minimap_click_or_the_compartment_is_kept(me):
+    me.run("ns.UI.Toggle = function() error('se rompio el carton') end")
+    me.run("ns.MinimapButton():GetScript('OnClick')(ns.MinimapButton(), 'LeftButton')")
+    me.run("BingoDeLaGuild_OnAddonCompartmentClick()")
+    errs = me.run("return ns.guard.Errors()")
+    assert sorted(e.label for e in errs.values()) == ["compartment", "minimap"]
