@@ -5,6 +5,7 @@
 ## Notes-esMX: Un cartón de bingo semanal con metas divertidas, compartido con tu guild.
 ## Author: José Argento
 ## Version: @project-version@
+## X-Curse-Project-ID: 1787055
 ## SavedVariables: BingoDeLaGuildDB
 ## IconTexture: Interface\AddOns\BingoDeLaGuild\Media\icon
 ## AddonCompartmentFunc: BingoDeLaGuild_OnAddonCompartmentClick
