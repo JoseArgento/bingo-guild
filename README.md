@@ -6,6 +6,8 @@ Un cartón de bingo por semana para jugar con tu guild en **WoW Forever**. Son 2
 
 ![El cartón de la semana en el juego](docs/libro.png)
 
+**Descargar:** en [CurseForge](https://www.curseforge.com/wow/addons/bingo-de-la-guild) (también con la app de CurseForge o WowUp) o el zip de las [releases](https://github.com/JoseArgento/bingo-guild/releases).
+
 **Contenido**
 
 - [Cómo se juega](#cómo-se-juega)

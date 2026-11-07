@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-11-07)
 
 - **Minimap button like the game's** (Pergamino 7): gold bevelled ring, dark disc, shadow, a cream icon; `/bingo minimapa juntar on|off` puts every addon of the family into one button with a menu. Errors in the minimap button and the addon compartment are kept too (`/bingo errores`).
 - **Its own errors, kept** (Pergamino 5): a Lua error in a handler no longer reaches the player as a popup; it is kept in `BingoDeLaGuildDB.errors` (last 10), said once in the chat, and `/bingo errores` opens an "Errores" bookmark to copy it into a GitHub issue. The bookmark only shows while there is something kept.

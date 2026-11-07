@@ -6,6 +6,8 @@ A weekly bingo card to play with your guild in **WoW Forever**: 24 small, slight
 
 ![The week's card in the game](docs/libro.png)
 
+**Download:** on [CurseForge](https://www.curseforge.com/wow/addons/bingo-de-la-guild) (also through the CurseForge app or WowUp) or the zip from the [releases](https://github.com/JoseArgento/bingo-guild/releases).
+
 - Open it with `/bingo`, from the addon compartment by the minimap or with a key binding. **The window is an open book**: the card is stamped on the left page (marked squares turn gold with a tick, a complete line crimson, the free one carries a wax seal) and the cloth bookmarks on the edge turn the page: **Card** (your guild this week), **League** and, for officers only, **Officers**. It is the [Pergamino](https://github.com/JoseArgento/pergamino) skin shared with Bitácora and the rest of the family; the fonts (Alegreya and Cinzel, OFL) ship inside the addon. `/bingo sync` asks the guild for their cards again.
 - **Minimap button**: left click opens the card, right click the league; drag it around the minimap, `/bingo minimapa off` hides it (`on` brings it back); `/bingo minimap merge on` puts the whole family of addons into one button with a menu.
 - **Language**: follows the client's, or pick one with `/bingo idioma es` / `en` / `auto` (so Spanish speakers on an English client get Spanish). The window changes at once; chat texts after a `/reload`.
