@@ -9,7 +9,7 @@
 -- No Blizzard frame templates: every piece is drawn here.
 
 local ADDON = ...
-local VERSION = 7
+local VERSION = 8
 
 if Pergamino and (Pergamino.VERSION or 0) >= VERSION then
 	return
@@ -773,7 +773,9 @@ end
 --   shown        = bool                                false hides it (default true)
 --   guard        = a P.Guard instance                  wraps onClick/onRightClick/tooltip (errors kept, no popup)
 --   hub          = { addon = "X", label = "Bitácora", order = 10 }  also registers it in the family hub
--- Returns the Button with :SetAngle(deg), .angle, .icon, .ring, .disc; SetShown as any frame.
+-- Returns the Button with :SetAngle(deg), .angle, .icon, .ring, .disc. SetShown / Show / Hide say what the
+-- ADDON wants (button.wanted); while the family is merged into one button the hub keeps it hidden anyway,
+-- so an addon can call SetShown(settings.minimap) whenever it likes without leaking out of the hub.
 local MINIMAP_RADIUS_EXTRA = 5
 local MINIMAP_SIZE = 34
 
@@ -876,9 +878,29 @@ function P.MinimapButton(name, opts)
 		end
 	end)
 	b:SetAngle(opts.angle)
-	b.wanted = opts.shown ~= false
-	b:SetShown(b.wanted)
+	-- the frame's own Show and Hide, kept before they are replaced below
+	local rawShow, rawHide = b.Show, b.Hide
+	local function rawSetShown(self, shown)
+		if shown then
+			rawShow(self)
+		else
+			rawHide(self)
+		end
+	end
+	b.rawSetShown = rawSetShown
+	function b:SetShown(shown)
+		self.wanted = shown and true or false
+		rawSetShown(self, self.wanted and not (self.inHub and P.MinimapHub.merged))
+	end
+	function b:Show()
+		self:SetShown(true)
+	end
+	function b:Hide()
+		self:SetShown(false)
+	end
+	b:SetShown(opts.shown ~= false)
 	if opts.hub then
+		b.inHub = true
 		P.MinimapHub.Register(opts.hub.addon or name, {
 			icon = opts.icon,
 			label = opts.hub.label or opts.hub.addon or name,
@@ -898,17 +920,22 @@ end
 -- the individual buttons hide and ONE button with the lib's own picture opens a small parchment menu
 -- with a row per addon: click opens it, right click does its right-click action.
 --   P.MinimapHub.Register(addonName, { icon, label, onClick(button), onRightClick, order, tooltip, button })
---   P.MinimapHub.SetMerged(bool)   the addon that owns the setting calls it (and saves the value itself);
---                                 every registered button follows
+--   P.MinimapHub.Bind(settings)    the addon hands over its saved settings table, once, after making its
+--                                 button. The hub keeps the family's choice in EVERY bound table
+--                                 (minimapMerged, minimapMergedAt, minimapHubAngle), so it survives whichever
+--                                 addons are enabled; the newest choice (minimapMergedAt) wins at login.
+--   P.MinimapHub.Choose(bool)      the player's choice, from any addon's options or slash command
 --   P.MinimapHub.IsMerged()
---   P.MinimapHub.SetAngle(deg) / OnMove(function(angle))  the merged button's place (the owner saves it)
+--   P.MinimapHub.SetMerged(bool)   just applies it (no saving): what Bind and Choose use
+--   P.MinimapHub.SetAngle(deg) / OnMove(function(angle))  the merged button's place (Bind saves it)
 --   P.MinimapHub.Entries()         the registered addons, in order
--- Pattern for the owner (any addon can be the owner; the last one to call SetMerged wins):
---   in ADDON_LOADED: if settings.minimapMerged ~= nil then P.MinimapHub.SetMerged(settings.minimapMerged) end
---   in its options:  settings.minimapMerged = v; P.MinimapHub.SetMerged(v)
+-- Pattern for an addon:
+--   after P.MinimapButton(..., { hub = {...} }):  P.MinimapHub.Bind(settings)
+--   in its options / slash:                        P.MinimapHub.Choose(v)
 P.MinimapHub = P.MinimapHub or {}
 local Hub = P.MinimapHub
 Hub.entries = Hub.entries or {}
+Hub.bound = Hub.bound or {}
 Hub.merged = Hub.merged or false
 
 local function hubSort()
@@ -923,8 +950,17 @@ end
 
 local function hubApply()
 	for _, e in ipairs(Hub.entries) do
-		if e.button then
-			e.button:SetShown((not Hub.merged) and e.button.wanted ~= false)
+		local b = e.button
+		if b then
+			-- a button made by this copy remembers what its addon wants; one made by an older copy does not
+			-- have the raw method, so it is shown or hidden the plain way
+			local visible = (not Hub.merged) and b.wanted ~= false
+			if b.rawSetShown then
+				b.inHub = true
+				b.rawSetShown(b, visible)
+			else
+				b:SetShown(visible)
+			end
 		end
 	end
 	if Hub.button then
@@ -1074,6 +1110,9 @@ local function hubButton()
 		end,
 		onMove = function(angle)
 			Hub.angle = angle
+			for _, s in ipairs(Hub.bound) do
+				s.minimapHubAngle = angle
+			end
 			if Hub.onMove then
 				Hub.onMove(angle)
 			end
@@ -1103,6 +1142,53 @@ function Hub.SetAngle(deg)
 	if Hub.button then
 		Hub.button:SetAngle(deg)
 	end
+end
+
+-- every bound settings table says the same as the hub
+local function hubSave()
+	if Hub.mergedAt == nil then
+		return -- nobody has chosen yet: leave the tables alone
+	end
+	for _, s in ipairs(Hub.bound) do
+		s.minimapMerged = Hub.merged
+		s.minimapMergedAt = Hub.mergedAt
+	end
+end
+
+function Hub.Bind(settings)
+	if type(settings) ~= "table" then
+		return
+	end
+	for _, s in ipairs(Hub.bound) do
+		if s == settings then
+			return
+		end
+	end
+	table.insert(Hub.bound, settings)
+	-- the choice: a table that has one speaks when it is the first to, or when its choice is newer
+	if settings.minimapMerged ~= nil then
+		local at = tonumber(settings.minimapMergedAt) or 0
+		if Hub.mergedAt == nil or at > Hub.mergedAt then
+			Hub.mergedAt = at
+			Hub.SetMerged(settings.minimapMerged)
+		end
+	end
+	hubSave()
+	-- the merged button's place: the first table that knows it tells the rest
+	if Hub.angle == nil and tonumber(settings.minimapHubAngle) then
+		Hub.SetAngle(tonumber(settings.minimapHubAngle))
+	end
+	if Hub.angle ~= nil then
+		for _, s in ipairs(Hub.bound) do
+			s.minimapHubAngle = Hub.angle
+		end
+	end
+end
+
+function Hub.Choose(v)
+	Hub.mergedAt = (time and time()) or 0
+	Hub.SetMerged(v)
+	hubSave()
 end
 
 function Hub.OnMove(fn)
@@ -1137,6 +1223,64 @@ P.QUALITY_INK = {
 }
 function P.QualityInk(quality)
 	return P.QUALITY_INK[quality] or P.QUALITY_INK[1]
+end
+
+-- The colour in front of a chat link, game → ink, for text the player edits (the link itself is kept, so the
+-- tooltip and the shift-click still work). One ink per game colour, so GameLinks can put the original back.
+P.LINK_INK = {
+	ff9d9d9d = P.QUALITY_INK[0],
+	ffffffff = P.QUALITY_INK[1],
+	ff1eff00 = P.QUALITY_INK[2],
+	ff0070dd = P.QUALITY_INK[3],
+	ffa335ee = P.QUALITY_INK[4],
+	ffff8000 = P.QUALITY_INK[5],
+	ffe6cc80 = P.QUALITY_INK[6],
+	ff00ccff = P.QUALITY_INK[7],
+	ffffff00 = "ff7a5c00", -- quests and achievements: dark amber
+	ff71d5ff = "ff1d5f85", -- spells: slate blue
+	ffffd000 = "ff8f5f10", -- enchants and trade skills: bronze
+	ff4e96f7 = "ff2e4a8c", -- talents: indigo
+	ff66bbff = "ff245a80", -- glyphs and the like
+	ff00ff00 = "ff23682a", -- plain green
+}
+local INK_LINK, INK_QUALITY = {}, {}
+for game, ink in pairs(P.LINK_INK) do
+	INK_LINK[ink] = game
+end
+for q, ink in pairs(P.QUALITY_INK) do
+	INK_QUALITY[ink] = q
+end
+
+-- "|cffffffff|Hitem:1|h[Linen Cloth]|h|r" → the same link in ink. Newer clients write item links as
+-- "|cnIQ2:|Hitem…" (a named quality colour): those become ink too, and P.iqLinks remembers the client does.
+function P.InkLinks(text)
+	if type(text) ~= "string" or not text:find("|H", 1, true) then
+		return text
+	end
+	text = text:gsub("|cnIQ(%d+):(|H)", function(q, h)
+		P.iqLinks = true
+		return "|c" .. P.QualityInk(tonumber(q)) .. h
+	end)
+	text = text:gsub("|c(%x%x%x%x%x%x%x%x)(|H)", function(c, h)
+		return "|c" .. (P.LINK_INK[c:lower()] or c) .. h
+	end)
+	return text
+end
+
+-- The other way, for what is saved or shown on a dark tooltip: ink → the game's own colour.
+function P.GameLinks(text)
+	if type(text) ~= "string" or not text:find("|H", 1, true) then
+		return text
+	end
+	text = text:gsub("|c(%x%x%x%x%x%x%x%x)(|H)", function(c, h)
+		c = c:lower()
+		local q = INK_QUALITY[c]
+		if q and P.iqLinks then
+			return "|cnIQ" .. q .. ":" .. h
+		end
+		return "|c" .. (INK_LINK[c] or c) .. h
+	end)
+	return text
 end
 
 -- A chat link coloured for the page: ref is "item:123" (or any |H ref), name the bracketed text.

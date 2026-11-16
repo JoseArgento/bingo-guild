@@ -36,16 +36,14 @@ function ns.MinimapButton()
 		guard = ns.guard,
 		hub = { addon = L.TITLE, label = L.TITLE, order = 3 },
 	})
-	if s.minimapMerged ~= nil then
-		Pergamino.MinimapHub.SetMerged(s.minimapMerged)
-	end
+	-- the family's choice (one button for all) lives in every addon's settings: the hub reads and keeps it
+	Pergamino.MinimapHub.Bind(s)
 	return button
 end
 
 -- /bingo minimapa juntar on|off: one button for the whole family (the lib keeps it for every addon)
 function ns.SetMinimapMerged(merged)
-	ns.db.settings.minimapMerged = merged and true or false
-	Pergamino.MinimapHub.SetMerged(merged)
+	Pergamino.MinimapHub.Choose(merged) -- saved by the hub in every addon's settings
 	ns.Print(merged and L.MINIMAP_MERGED_ON or L.MINIMAP_MERGED_OFF)
 end
 
