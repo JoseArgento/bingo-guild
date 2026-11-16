@@ -1123,3 +1123,30 @@ def test_an_error_in_the_minimap_click_or_the_compartment_is_kept(me):
     me.run("BingoDeLaGuild_OnAddonCompartmentClick()")
     errs = me.run("return ns.guard.Errors()")
     assert sorted(e.label for e in errs.values()) == ["compartment", "minimap"]
+
+
+def test_my_own_card_coming_back_and_the_untidy_realm_key_are_tidied():
+    # Forever (seen 16/11): the sender of my own message is "Rumie Victoria", never equal to UnitName; and the
+    # character had two keys, "Rumie-CAMWOWUS1Realm5PvE" and "Rumie-CAMWOW US1 Realm 5 PvE"
+    me = Client("Rumie")
+    me.run("UnitFullName = function() return 'Rumie', 'Victoria' end; GetNormalizedRealmName = function() return nil end; GetRealmName = function() return 'CAMWOW US1 Realm 5 PvE' end")
+    assert me.ns.CharKey() == "Rumie-CAMWOWUS1Realm5PvE"  # the same key with or without the normalised name
+    me.run("GetNormalizedRealmName = function() return 'CAMWOWUS1Realm5PvE' end")
+    assert me.ns.CharKey() == "Rumie-CAMWOWUS1Realm5PvE"
+    me.login()
+    me.run("""
+        ns.db.chars["Rumie-CAMWOW US1 Realm 5 PvE"] = { weeks = { ["200"] = { marks = "1", t = 20 }, ["100"] = { marks = "old", t = 1 } } }
+        ns.db.chars["Rumie-CAMWOWUS1Realm5PvE"] = { weeks = { ["100"] = { marks = "new", t = 5 } } }
+        ns.db.guilds["g:X"] = { ["200"] = { ["Rumie Victoria"] = { m = "1", t = 1 }, ["Ana"] = { m = "0", t = 1 } } }
+        ns.TidySaved()
+    """)
+    assert me.run("return ns.db.chars['Rumie-CAMWOW US1 Realm 5 PvE']") is None
+    weeks = me.run("return ns.db.chars['Rumie-CAMWOWUS1Realm5PvE'].weeks")
+    assert weeks["200"].marks == "1" and weeks["100"].marks == "new"
+    assert me.run("return ns.db.guilds['g:X']['200']['Rumie Victoria'], ns.db.guilds['g:X']['200'].Ana ~= nil") == (None, True)
+    # the echo of my own marks is ignored from now on
+    before = me.run("local n = 0; for _, weeks in pairs(ns.db.guilds) do for _, cards in pairs(weeks) do for _ in pairs(cards) do n = n + 1 end end end; return n")
+    for _prefix, text, _chat in [("BingoGuild1", "C|3|1|" + "0" * 25, "GUILD")]:
+        me.receive(text, sender="Rumie Victoria")
+    after = me.run("local n = 0; for _, weeks in pairs(ns.db.guilds) do for _, cards in pairs(weeks) do for _ in pairs(cards) do n = n + 1 end end end; return n")
+    assert after == before

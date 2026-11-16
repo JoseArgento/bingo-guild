@@ -2,6 +2,7 @@
 
 ## 0.3.0 (unreleased)
 
+- **You were in the guild's cards twice.** In Forever the sender of a message arrives as "Name Second", which never equals `UnitName`: the echo of your own marks was kept as another player's card. Fixed (Pergamino 9, `IsMe`); the copies are dropped at login. Also: a character could get two saved keys (the realm with and without spaces, depending on the moment of login) and the week's marks went to one or the other: one key now, and the old ones are merged.
 - **The button no longer stays outside the family's one minimap button** (Pergamino 8). With "one button for the family" chosen in another addon, an addon that showed its own button afterwards sat outside the hub (seen with Taller). The choice is now saved in every addon of the family, so it holds whichever ones are enabled (`/bingo minimapa juntar on|off` from any of them), and the merged button remembers where you dragged it.
 
 ## 0.2.0 (2026-11-07)

@@ -206,6 +206,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
 			SlashCmdList.BINGODELAGUILD = ns.guard.Install(frame, onSlash)
 		end
 	elseif event == "PLAYER_LOGIN" then
+		ns.TidySaved()
 		C_ChatInfo.RegisterAddonMessagePrefix(ns.PREFIX)
 		for e in pairs(handlers) do
 			frame:RegisterEvent(e)

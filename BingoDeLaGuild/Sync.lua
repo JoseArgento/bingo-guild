@@ -395,7 +395,8 @@ function ns.OnAddonMessage(prefix, text, channel, sender)
 		return
 	end
 	sender = Ambiguate(sender, "none")
-	if sender == ns.Me() then
+	-- my own message coming back: Forever senders are "Name Second", which UnitName never equals
+	if Pergamino.IsMe(sender) then
 		return
 	end
 	local kind, pool, week, rest = text:match("^([CQKGS])|(%d+)|(%d+)|?(.*)$")

@@ -80,8 +80,51 @@ function ns.Me()
 	return (UnitName("player"))
 end
 
+-- "Name-Realm", the realm without spaces or hyphens. GetNormalizedRealmName is nil for a moment at login:
+-- the fallback used to be GetRealmName as it comes ("CAMWOW US1 Realm 5 PvE"), a second key for the same
+-- character, and the week's marks went to one or the other.
+local function tidyRealm(realm)
+	return (tostring(realm or "?"):gsub("[%s%-]", ""))
+end
 function ns.CharKey()
-	return (UnitName("player") or "?") .. "-" .. (GetNormalizedRealmName() or GetRealmName() or "?")
+	return (UnitName("player") or "?") .. "-" .. tidyRealm(GetNormalizedRealmName() or GetRealmName())
+end
+
+-- Saved data from before 0.3.0: characters under an untidy realm go into their tidy key (a week is kept from
+-- whichever has it; with both, the one marked last), and the copies of my own card that came back from the
+-- guild channel under my two-part name are dropped.
+function ns.TidySaved()
+	local chars = ns.db.chars
+	for key, c in pairs(chars) do
+		local name, realm = key:match("^([^%-]+)%-(.+)$")
+		local tidy = name and (name .. "-" .. tidyRealm(realm))
+		if tidy and tidy ~= key then
+			local into = chars[tidy]
+			if type(into) ~= "table" then
+				chars[tidy] = c
+			elseif type(c) == "table" and type(c.weeks) == "table" then
+				into.weeks = type(into.weeks) == "table" and into.weeks or {}
+				for week, w in pairs(c.weeks) do
+					local have = into.weeks[week]
+					if type(have) ~= "table" or (type(w) == "table" and (w.t or 0) > (have.t or 0)) then
+						into.weeks[week] = w
+					end
+				end
+			end
+			chars[key] = nil
+		end
+	end
+	for _, weeks in pairs(ns.db.guilds or {}) do
+		for _, cards in pairs(weeks) do
+			if type(cards) == "table" then
+				for sender in pairs(cards) do
+					if Pergamino.IsMe(sender) then
+						cards[sender] = nil
+					end
+				end
+			end
+		end
+	end
 end
 
 -- Whose card this is: the guild's (everyone in it draws the same one) or, outside a guild, just yours.

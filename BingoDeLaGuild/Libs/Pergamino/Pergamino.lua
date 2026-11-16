@@ -9,7 +9,7 @@
 -- No Blizzard frame templates: every piece is drawn here.
 
 local ADDON = ...
-local VERSION = 8
+local VERSION = 9
 
 if Pergamino and (Pergamino.VERSION or 0) >= VERSION then
 	return
@@ -1193,6 +1193,45 @@ end
 
 function Hub.OnMove(fn)
 	Hub.onMove = fn
+end
+
+-- who am I ---------------------------------------------------------------------------------------------------
+-- Is this name the player's? For the sender of an addon message or a chat line, or a name from a roster.
+-- Forever names have two parts ("Rumie Victoria"): UnitName("player") gives only the first, UnitFullName
+-- gives the two as (name, second), and a sender arrives as "Rumie Victoria", maybe with "-Realm" after
+-- (seen in saved data, 16/11/2026: every addon that compared the sender with UnitName kept the echo of its
+-- own messages as another player's). So: no case, and spaces and hyphens do not count.
+local function squash(s)
+	return (tostring(s or ""):lower():gsub("[%s%-]+", ""))
+end
+function P.IsMe(name)
+	if type(name) ~= "string" or name == "" or (issecretvalue and issecretvalue(name)) then
+		return false
+	end
+	local first, second = UnitName("player")
+	if UnitFullName then
+		local a, b = UnitFullName("player")
+		first, second = a or first, b or second
+	end
+	if type(first) ~= "string" or first == "" or (issecretvalue and issecretvalue(first)) then
+		return false
+	end
+	if type(second) ~= "string" or (issecretvalue and issecretvalue(second)) then
+		second = ""
+	end
+	local n = squash(name)
+	local short, full = squash(first), squash(first .. second)
+	if n == short or n == full then
+		return true
+	end
+	-- with the realm after it, as the game writes it ("Area 52") or normalised ("Area52")
+	for _, realm in ipairs({ GetNormalizedRealmName and GetNormalizedRealmName() or "", GetRealmName and GetRealmName() or "" }) do
+		local r = squash(realm)
+		if r ~= "" and (n == short .. r or n == full .. r) then
+			return true
+		end
+	end
+	return false
 end
 
 -- the addon's own errors -----------------------------------------------------------------------------------
